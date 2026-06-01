@@ -321,6 +321,7 @@ function finishLoad(filename, rowCount, headerAutoDetected, idbType, loadedAt) {
 
   restoreUploadSection([]);  // clear upload section
   document.getElementById("upload-section").classList.add("d-none");
+  document.getElementById("main-tab-bar").classList.remove("d-none");
   var sb = document.getElementById("status-bar");
   sb.classList.remove("d-none");
   sb.classList.add("d-flex");
@@ -656,6 +657,7 @@ function resetApp() {
   var sb = document.getElementById("status-bar");
   sb.classList.remove("d-flex");
   sb.classList.add("d-none");
+  document.getElementById("main-tab-bar").classList.add("d-none");
 
   // Clear all tab panes
   ["tab-overview","tab-details","tab-customer","tab-pvi","tab-lifecycle","tab-cpi-adopt"].forEach(function (id) {
