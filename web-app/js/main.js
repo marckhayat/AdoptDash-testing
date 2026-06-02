@@ -792,8 +792,16 @@ function restoreUploadSection(cachedEntries) {
           var notFound = sessions.filter(function(s) { return s.rows.length === 0; });
 
           if (found.length === 0) {
-            IDB.loadAll().then(function(en) { restoreUploadSection(en); });
-            alert("No rows found for " + (idsToLoad.length === 1 ? "BE GEO ID " + idsToLoad[0] : "any of the entered IDs") + " in " + file.name + ".\nPlease check the IDs and try again.");
+            IDB.loadAll().then(function(en) {
+              restoreUploadSection(en);
+              var errEl = document.getElementById("lci-error");
+              if (errEl) {
+                errEl.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i>No data found for ' +
+                  (idsToLoad.length === 1 ? 'BE GEO ID <strong>' + idsToLoad[0] + '</strong>' : 'any of the entered IDs') +
+                  ' in <strong>' + file.name + '</strong>. Please check the IDs and try again.';
+                errEl.classList.remove("d-none");
+              }
+            });
             return;
           }
 
