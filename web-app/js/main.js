@@ -7,7 +7,7 @@ var APP_DATA = null;
 var APP_FILE_META = null;
 var APP_IS_DISTI = false;
 var APP_MULTI_SESSIONS = null; // { sessions: [...], fileMeta: {...} }
-var APP_VERSION = "v6.3.1";
+var APP_VERSION = "v6.3.2";
 
 // Workspan column names used to auto-detect the header row
 var KNOWN_COLUMNS = [
@@ -1051,11 +1051,11 @@ function restoreUploadSection(cachedEntries) {
   renderMultiPicker(); // show persistent session bar if APP_MULTI_SESSIONS is set
 
   // ── Update check (runs once per page load) ────────────────────────────────
-  fetch("https://api.github.com/repos/marckhayat/AdoptDash/tags")
+  fetch("https://api.github.com/repos/marckhayat/AdoptDash/releases/latest")
     .then(function(r) { return r.ok ? r.json() : null; })
-    .then(function(tags) {
-      if (!Array.isArray(tags) || tags.length === 0) return;
-      var latest = tags[0].name;
+    .then(function(release) {
+      if (!release || !release.tag_name) return;
+      var latest = release.tag_name;
       if (latest && latest !== APP_VERSION) {
         var container = document.getElementById("notif-toast-container");
         if (container) {
@@ -1068,7 +1068,7 @@ function restoreUploadSection(cachedEntries) {
               '</div>' +
               '<div class="toast-body small">' +
                 'Version <strong>' + latest + '</strong> is available. ' +
-                '<a href="https://github.com/marckhayat/AdoptDash/tags" target="_blank" rel="noopener">View changelog</a>' +
+                '<a href="https://github.com/marckhayat/AdoptDash/releases/latest" target="_blank" rel="noopener">View release notes</a>' +
               '</div>' +
             '</div>';
           container.insertAdjacentHTML("afterbegin", html);

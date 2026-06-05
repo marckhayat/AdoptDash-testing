@@ -9,6 +9,7 @@ var _cpiChart3 = null;
 var _cpiChart4 = null;
 var _cpiChart5 = null;
 var _cpiChart6 = null;
+var _cpiChart7 = null;
 var _cpiChart5Log = false;
 
 function renderCPIAdopt(data) {
@@ -70,20 +71,19 @@ function renderCPIAdopt(data) {
 
   // ── Stat charts row: Eligible-only pie | Eligible+Expired pie | Earned by Portfolio
   html += '<div class="col-12 col-lg-4">';
-  html += '<div class="card shadow-sm h-100"><div class="card-header fw-semibold">Incentives <small class="fw-normal">(eligible UCs only)</small> <i class="bi bi-info-circle text-muted ms-1" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Breakdown of the total revised maximum incentive for currently Eligible deals: Earned, Missed, Potential (opted-in remaining), and Not opted-in."></i></div><div class="card-body">';
+  html += '<div class="card shadow-sm h-100"><div class="card-header fw-semibold d-flex align-items-center justify-content-between flex-wrap gap-1"><span>Incentives <i class="bi bi-info-circle text-muted ms-1" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Breakdown of incentives."></i></span><div class="btn-group btn-group-sm" id="cpi-incentive-mode"><button type="button" class="btn btn-outline-primary active" data-mode="eligible">Eligible</button><button type="button" class="btn btn-outline-primary" data-mode="eligible-expired">Eligible &amp; Expired</button></div></div><div class="card-body">';
   html += '<div class="chart-container" style="min-height:220px;height:220px"><canvas id="cpi-chart2b"></canvas></div>';
-  html += '<div id="cpi-ratio-elig" class="text-center mt-2"></div>';
+  html += '<div id="cpi-ratio-incentive" class="text-center mt-2"></div>';
   html += '</div></div></div>';
 
   html += '<div class="col-12 col-lg-4">';
-  html += '<div class="card shadow-sm h-100"><div class="card-header fw-semibold">Incentives <small class="fw-normal">(eligible &amp; expired UCs)</small> <i class="bi bi-info-circle text-muted ms-1" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Breakdown of the total revised maximum incentive for Eligible and Expired deals: Earned, Missed, Potential (opted-in remaining), and Not opted-in."></i></div><div class="card-body">';
-  html += '<div class="chart-container" style="min-height:220px;height:220px"><canvas id="cpi-chart2"></canvas></div>';
-  html += '<div id="cpi-ratio-eligexp" class="text-center mt-2"></div>';
-  html += '</div></div></div>';
-
-  html += '<div class="col-12 col-lg-4">';
-  html += '<div class="card shadow-sm h-100"><div class="card-header fw-semibold d-flex justify-content-between align-items-center"><span>Total Earned by Portfolio <i class="bi bi-info-circle text-muted ms-1" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Total estimated earned incentives per portfolio (all-time, not filtered by FY)."></i></span><span id="cpi-chart6-total" class="fw-normal text-muted"></span></div><div class="card-body">';
+  html += '<div class="card shadow-sm h-100"><div class="card-header fw-semibold d-flex justify-content-between align-items-center"><span>Total Estimated Earned by Portfolio <i class="bi bi-info-circle text-muted ms-1" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Total estimated earned incentives per portfolio (all-time, not filtered by FY)."></i></span><span id="cpi-chart6-total" class="fw-normal text-muted"></span></div><div class="card-body">';
   html += '<div class="chart-container" style="min-height:220px;height:220px"><canvas id="cpi-chart6"></canvas></div>';
+  html += '</div></div></div>';
+
+  html += '<div class="col-12 col-lg-4">';
+  html += '<div class="card shadow-sm h-100"><div class="card-header fw-semibold d-flex justify-content-between align-items-center"><span>Potential Incentives by Portfolio <i class="bi bi-info-circle text-muted ms-1" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Remaining potential incentives for opted-in Eligible deals, per portfolio."></i></span><span id="cpi-chart7-total" class="fw-normal text-muted"></span></div><div class="card-body">';
+  html += '<div class="chart-container" style="min-height:220px;height:220px"><canvas id="cpi-chart7"></canvas></div>';
   html += '</div></div></div>';
 
   html += '</div>'; // stat charts row
@@ -206,126 +206,158 @@ function renderCPIAdopt(data) {
     });
 
     // Compute measures
-    var eligPayout  = 0;
-    var optedPayout = 0;
-    var estEarned   = 0;
-    var potRemain   = 0;
-    var revMax      = 0;
-    var missedIncent = 0;
-    var totalMax    = 0; // Revised Max for all eligible/expired deals (the 100%)
+    var eligTotalMax    = 0; // Revised Max for eligible deals
+    var totalMax        = 0; // Revised Max for eligible+expired deals
+    var eligEarned      = 0; // Estimated Earned for opted-in eligible
+    var eligMissed      = 0; // Missed for opted-in eligible
+    var eligPotential   = 0; // Potential Incentives for opted-in eligible
+    var eligNotOptedMax = 0; // Revised Max for not-opted-in eligible
+    var allEarned       = 0; // Estimated Earned for opted-in eligible+expired
+    var allMissed       = 0; // Missed for opted-in eligible+expired
+    var allPotential    = 0; // Potential Incentives for opted-in eligible+expired
+    var allNotOptedMax  = 0; // Revised Max for not-opted-in eligible+expired
+    var allExpired      = 0; // Revised Max - Earned for opted-in expired (no potential)
+    var eligOptedMax    = 0; // Revised Max for opted-in eligible (for ratio)
+    var allOptedMax     = 0; // Revised Max for opted-in eligible+expired (for ratio)
 
     subset.forEach(function (r) {
       var maxIncentive = parseFloat(r["Revised Maximum Incentive Amount"]) || 0;
-      var isEligible  = norm(r["Stage"]) === "ELIGIBLE";
-      var isExpired   = norm(r["Stage"]) === "EXPIRED";
-      var isOptedIn   = norm(r["Adopt Rebate Opt-In Status"]) === "OPTED IN";
+      var isEligible   = norm(r["Stage"]) === "ELIGIBLE";
+      var isExpired    = norm(r["Stage"]) === "EXPIRED";
+      var isOptedIn    = norm(r["Adopt Rebate Opt-In Status"]) === "OPTED IN";
 
+      if (isEligible) eligTotalMax += maxIncentive;
       if (isEligible || isExpired) totalMax += maxIncentive;
 
       if (isEligible) {
-        eligPayout += maxIncentive;
-        if (isOptedIn) optedPayout += maxIncentive;
-      }
-
-      if (isOptedIn) {
-        estEarned    += parseFloat(r["Estimated Earned Incentives"]) || 0;
-        missedIncent += parseFloat(r["Missed Incentives"]) || 0;
-        if (isEligible) {
-          potRemain += maxIncentive;
-        }
-        if (isEligible || isExpired) {
-          revMax += maxIncentive;
+        if (isOptedIn) {
+          eligOptedMax  += maxIncentive;
+          eligEarned    += parseFloat(r["Estimated Earned Incentives"]) || 0;
+          eligMissed    += parseFloat(r["Missed Incentives"]) || 0;
+          eligPotential += parseFloat(r["Potential Incentives"]) || 0;
+        } else {
+          eligNotOptedMax += maxIncentive;
         }
       }
-    });
-
-    var notOptedPayout = Math.max(0, eligPayout - optedPayout);
-    var ratio = eligPayout > 0 ? optedPayout / eligPayout : 0;
-
-    // ── Chart 2: Pie — breakdown of total max incentive (eligible/expired)
-    // 100% = totalMax; slices: Earned | Missed | Opted-in remaining | Not opted-in
-    var optedInRemain = Math.max(0, revMax - estEarned - missedIncent);
-    var notOptedInMax = Math.max(0, totalMax - revMax);
-    if (_cpiChart2) { _cpiChart2.destroy(); _cpiChart2 = null; }
-    var ctx2 = document.getElementById("cpi-chart2").getContext("2d");
-    _cpiChart2 = new Chart(ctx2, {
-      type: "doughnut",
-      data: {
-        labels: ["Earned", "Missed", "Potential", "Not opted-in"],
-        datasets: [{
-          data: [estEarned, missedIncent, optedInRemain, notOptedInMax],
-          backgroundColor: ["#107C10", "#D13438", "#00BCF2", "#D0D0D0"],
-          borderWidth: 1
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } },
-          tooltip: {
-            callbacks: {
-              label: function (ctx) {
-                var v = ctx.raw;
-                var pct = totalMax > 0 ? " (" + Math.round(v / totalMax * 100) + "%)" : "";
-                var fmt = Math.abs(v) >= 1000000 ? "$"+(v/1000000).toFixed(2)+"M"
-                        : Math.abs(v) >= 1000    ? "$"+(v/1000).toFixed(1)+"K"
-                        : "$"+Math.round(v).toLocaleString();
-                return ctx.label + ": " + fmt + pct;
-              }
-            }
+      if (isEligible || isExpired) {
+        if (isOptedIn) {
+          allOptedMax  += maxIncentive;
+          allEarned    += parseFloat(r["Estimated Earned Incentives"]) || 0;
+          allMissed    += parseFloat(r["Missed Incentives"]) || 0;
+          allPotential += parseFloat(r["Potential Incentives"]) || 0;
+          if (isExpired) {
+            allExpired += Math.max(0, maxIncentive - (parseFloat(r["Estimated Earned Incentives"]) || 0));
           }
+        } else {
+          allNotOptedMax += maxIncentive;
         }
       }
     });
 
-    // Opt-in ratio callout for eligible+expired chart
-    var eligExpRatio = totalMax > 0 ? Math.round(revMax / totalMax * 100) : 0;
-    document.getElementById("cpi-ratio-eligexp").innerHTML =
-      '<span style="font-size:1rem;font-weight:600;color:#00BCF2">' + eligExpRatio + '% opted-in</span>' +
-      '<span class="text-muted small ms-2">(' + fmtCurrency(revMax) + ' / ' + fmtCurrency(totalMax) + ')</span>';
-
-    // ── Chart 2b: Pie — same breakdown but eligible-only (no expired)
-    var eligEstEarned   = 0;
-    var eligMissed      = 0;
-    var eligRevMax      = 0;
-    var eligTotalMax    = 0;
-    subset.forEach(function (r) {
-      var maxIncentive = parseFloat(r["Revised Maximum Incentive Amount"]) || 0;
-      var isEligible  = norm(r["Stage"]) === "ELIGIBLE";
-      var isOptedIn   = norm(r["Adopt Rebate Opt-In Status"]) === "OPTED IN";
-      if (!isEligible) return;
-      eligTotalMax += maxIncentive;
-      if (isOptedIn) {
-        eligRevMax      += maxIncentive;
-        eligEstEarned   += parseFloat(r["Estimated Earned Incentives"]) || 0;
-        eligMissed      += parseFloat(r["Missed Incentives"]) || 0;
+    // ── Chart 2b: Pie — breakdown using Potential Incentives field, with toggle
+    var _incentiveMode = "eligible";
+    var _incentiveDatasets = {
+      "eligible": {
+        data:   [eligEarned, eligPotential, eligNotOptedMax, eligMissed],
+        labels: ["Earned", "Potential", "Not opted-in", "Missed"],
+        colors: ["#107C10", "#00BCF2", "#D0D0D0", "#D13438"],
+        optedInSlices: 2,
+        total: eligTotalMax, optedMax: eligOptedMax
+      },
+      "eligible-expired": {
+        data:   [allEarned, allPotential, allExpired, allNotOptedMax, allMissed],
+        labels: ["Earned", "Potential", "Expired", "Not opted-in", "Missed"],
+        colors: ["#107C10", "#00BCF2", "#FF8C00", "#D0D0D0", "#D13438"],
+        optedInSlices: 3,
+        total: totalMax, optedMax: allOptedMax
       }
-    });
-    var eligOptedInRemain = Math.max(0, eligRevMax - eligEstEarned - eligMissed);
-    var eligNotOptedIn    = Math.max(0, eligTotalMax - eligRevMax);
+    };
+
+    function renderIncentiveRatio(mode) {
+      var ds = _incentiveDatasets[mode];
+      var pct = ds.total > 0 ? Math.round(ds.optedMax / ds.total * 100) : 0;
+      document.getElementById("cpi-ratio-incentive").innerHTML =
+        '<span style="font-size:1rem;font-weight:600;color:#00BCF2">' + pct + '% opted-in</span>' +
+        '<span class="text-muted small ms-2">(' + fmtCurrency(ds.optedMax) + ' / ' + fmtCurrency(ds.total) + ')</span>';
+    }
+
     if (_cpiChart2b) { _cpiChart2b.destroy(); _cpiChart2b = null; }
+    if (_cpiChart2)  { _cpiChart2.destroy();  _cpiChart2  = null; }
     var ctx2b = document.getElementById("cpi-chart2b").getContext("2d");
+    var _currentIncentiveTotal = eligTotalMax;
+
+    var optedInArcPlugin = {
+      id: "optedInArc",
+      afterDatasetsDraw: function (chart) {
+        var meta = chart.getDatasetMeta(0);
+        if (!meta || !meta.data || meta.data.length < 2) return;
+        var arc0 = meta.data[0];
+        var lastOptedInIdx = chart.data._optedInSlices - 1;
+        var arcLast = meta.data[lastOptedInIdx];
+        if (!arc0 || !arcLast) return;
+        if ((arc0.circumference || 0) <= 0) return;
+        var c = chart.ctx;
+        var outerR = arc0.outerRadius + 6;
+        var cx = arc0.x, cy = arc0.y;
+        var startAngle = arc0.startAngle;
+        var endAngle   = arcLast.endAngle;
+        c.save();
+        c.beginPath();
+        c.arc(cx, cy, outerR, startAngle, endAngle);
+        c.strokeStyle = "#555";
+        c.lineWidth = 2.5;
+        c.stroke();
+        var drawTick = function (angle) {
+          c.beginPath();
+          c.moveTo(cx + Math.cos(angle) * (outerR - 3), cy + Math.sin(angle) * (outerR - 3));
+          c.lineTo(cx + Math.cos(angle) * (outerR + 3), cy + Math.sin(angle) * (outerR + 3));
+          c.stroke();
+        };
+        drawTick(startAngle);
+        drawTick(endAngle);
+        // leader line from arc quarter point → 3 o'clock position
+        var quarterAngle = startAngle + (endAngle - startAngle) * 0.25;
+        var lx1 = cx + Math.cos(quarterAngle) * outerR;
+        var ly1 = cy + Math.sin(quarterAngle) * outerR;
+        var rightX = cx + arc0.outerRadius + 10;
+        var rightY = cy; // 3 o'clock
+        c.beginPath();
+        c.moveTo(lx1, ly1);
+        c.lineTo(rightX, rightY);
+        c.strokeStyle = "#888";
+        c.lineWidth = 1;
+        c.stroke();
+        c.fillStyle = "#555";
+        c.font = "bold 9px sans-serif";
+        c.textAlign = "left";
+        c.textBaseline = "middle";
+        c.fillText("Opted-in", rightX + 4, rightY);
+        c.restore();
+      }
+    };
+
     _cpiChart2b = new Chart(ctx2b, {
       type: "doughnut",
       data: {
-        labels: ["Earned", "Missed", "Potential", "Not opted-in"],
+        labels: _incentiveDatasets["eligible"].labels.slice(),
+        _optedInSlices: _incentiveDatasets["eligible"].optedInSlices,
         datasets: [{
-          data: [eligEstEarned, eligMissed, eligOptedInRemain, eligNotOptedIn],
-          backgroundColor: ["#107C10", "#D13438", "#00BCF2", "#D0D0D0"],
+          data: _incentiveDatasets["eligible"].data.slice(),
+          backgroundColor: _incentiveDatasets["eligible"].colors.slice(),
           borderWidth: 1
         }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        layout: { padding: { top: 10, right: 28, bottom: 0, left: 28 } },
         plugins: {
           legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } },
           tooltip: {
             callbacks: {
               label: function (ctx) {
                 var v = ctx.raw;
-                var pct = eligTotalMax > 0 ? " (" + Math.round(v / eligTotalMax * 100) + "%)" : "";
+                var pct = _currentIncentiveTotal > 0 ? " (" + Math.round(v / _currentIncentiveTotal * 100) + "%)" : "";
                 var fmt = Math.abs(v) >= 1000000 ? "$"+(v/1000000).toFixed(2)+"M"
                         : Math.abs(v) >= 1000    ? "$"+(v/1000).toFixed(1)+"K"
                         : "$"+Math.round(v).toLocaleString();
@@ -334,14 +366,28 @@ function renderCPIAdopt(data) {
             }
           }
         }
-      }
+      },
+      plugins: [optedInArcPlugin]
     });
+    renderIncentiveRatio("eligible");
 
-    // Opt-in ratio callout for eligible-only chart
-    var eligOnlyRatio = eligTotalMax > 0 ? Math.round(eligRevMax / eligTotalMax * 100) : 0;
-    document.getElementById("cpi-ratio-elig").innerHTML =
-      '<span style="font-size:1rem;font-weight:600;color:#00BCF2">' + eligOnlyRatio + '% opted-in</span>' +
-      '<span class="text-muted small ms-2">(' + fmtCurrency(eligRevMax) + ' / ' + fmtCurrency(eligTotalMax) + ')</span>';
+    var incentiveModeEl = document.getElementById("cpi-incentive-mode");
+    if (incentiveModeEl) {
+      incentiveModeEl.addEventListener("click", function (e) {
+        var btn = e.target.closest("button[data-mode]");
+        if (!btn) return;
+        _incentiveMode = btn.dataset.mode;
+        incentiveModeEl.querySelectorAll("button").forEach(function (b) { b.classList.toggle("active", b.dataset.mode === _incentiveMode); });
+        var ds = _incentiveDatasets[_incentiveMode];
+        _currentIncentiveTotal = ds.total;
+        _cpiChart2b.data.labels = ds.labels.slice();
+        _cpiChart2b.data._optedInSlices = ds.optedInSlices;
+        _cpiChart2b.data.datasets[0].data = ds.data.slice();
+        _cpiChart2b.data.datasets[0].backgroundColor = ds.colors.slice();
+        _cpiChart2b.update();
+        renderIncentiveRatio(_incentiveMode);
+      });
+    }
 
     // ── Chart 6: Total Earned by Portfolio (all-time, not FY-filtered)
     var PORTFOLIO_COLORS = {
@@ -422,6 +468,74 @@ function renderCPIAdopt(data) {
                         : Math.abs(v) >= 1000    ? "$"+(v/1000).toFixed(1)+"K"
                         : "$"+Math.round(v).toLocaleString();
                 return "Earned: " + fmt;
+              }
+            }
+          }
+        }
+      }
+    });
+
+    // ── Chart 7: Potential Incentives by Portfolio (from Potential Incentives field, eligible opted-in)
+    var potByPortfolio = {};
+    var potPortfolios = portfolioFilter ? [portfolioFilter] : portfolios;
+    potPortfolios.forEach(function (p) { potByPortfolio[p] = 0; });
+    subset.forEach(function (r) {
+      var isEligible = norm(r["Stage"]) === "ELIGIBLE";
+      var isOptedIn  = norm(r["Adopt Rebate Opt-In Status"]) === "OPTED IN";
+      if (!isEligible || !isOptedIn) return;
+      var p = r["Deal CPI Portfolio"];
+      if (!p || potByPortfolio[p] === undefined) return;
+      potByPortfolio[p] += parseFloat(r["Potential Incentives"]) || 0;
+    });
+    var chart7Portfolios = potPortfolios.filter(function (p) { return potByPortfolio[p] > 0; });
+    chart7Portfolios.sort(function (a, b) { return potByPortfolio[b] - potByPortfolio[a]; });
+    var chart7GrandTotal = chart7Portfolios.reduce(function (s, p) { return s + potByPortfolio[p]; }, 0);
+    var chart7TotalFmt = Math.abs(chart7GrandTotal) >= 1000000 ? "$"+(chart7GrandTotal/1000000).toFixed(2)+"M"
+                       : Math.abs(chart7GrandTotal) >= 1000    ? "$"+(chart7GrandTotal/1000).toFixed(1)+"K"
+                       : "$"+Math.round(chart7GrandTotal).toLocaleString();
+    var t7El = document.getElementById("cpi-chart7-total");
+    if (t7El) { t7El.textContent = "Total: " + chart7TotalFmt; t7El.style.fontSize = "1rem"; t7El.style.fontWeight = "600"; t7El.style.color = "#555"; }
+    var chart7Colors = chart7Portfolios.map(function (p, idx) {
+      var fallback = ["#00BCF2","#E55400","#6BB700","#7B3F91","#FF8C00","#005B99"];
+      return PORTFOLIO_COLORS[p] || fallback[idx % fallback.length];
+    });
+    if (_cpiChart7) { _cpiChart7.destroy(); _cpiChart7 = null; }
+    var ctx7 = document.getElementById("cpi-chart7").getContext("2d");
+    _cpiChart7 = new Chart(ctx7, {
+      type: "bar",
+      data: {
+        labels: chart7Portfolios,
+        datasets: [{
+          label: "Potential",
+          data: chart7Portfolios.map(function (p) { return potByPortfolio[p]; }),
+          backgroundColor: chart7Colors
+        }]
+      },
+      options: {
+        indexAxis: "y",
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: {
+            beginAtZero: true,
+            ticks: { callback: function (v) {
+              if (Math.abs(v) >= 1000000) return "$"+(v/1000000).toFixed(1)+"M";
+              if (Math.abs(v) >= 1000)    return "$"+(v/1000).toFixed(0)+"K";
+              return "$"+Math.round(v).toLocaleString();
+            }}
+          },
+          y: { grid: { display: false } }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function (ctx) {
+                var v = ctx.raw;
+                var fmt = Math.abs(v) >= 1000000 ? "$"+(v/1000000).toFixed(2)+"M"
+                        : Math.abs(v) >= 1000    ? "$"+(v/1000).toFixed(1)+"K"
+                        : "$"+Math.round(v).toLocaleString();
+                return "Potential: " + fmt;
               }
             }
           }
