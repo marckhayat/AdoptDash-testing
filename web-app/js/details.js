@@ -244,6 +244,7 @@ function renderDetails(data) {
 
   // ── Slider display updater(defined here so it's available to all wiring below)
   var _sliderLastMoved = {}; // tracks "from" or "to" per prefix
+  if (!window._sliderUserSet) window._sliderUserSet = {};
 
   function updateSliderDisplay(prefix) {
     var fromEl  = document.getElementById(prefix + "-from");
@@ -342,6 +343,7 @@ function renderDetails(data) {
       el2.addEventListener("input", function () {
         delete this.dataset.intendedValue;
         _sliderLastMoved[prefix] = side;
+        window._sliderUserSet[prefix] = true;
         var fromEl = document.getElementById(prefix + "-from");
         var toEl   = document.getElementById(prefix + "-to");
         if (fromEl && toEl && parseInt(fromEl.value) > parseInt(toEl.value)) {
@@ -401,6 +403,8 @@ function renderDetails(data) {
   updateStageSliderDisplay();
 
   document.getElementById("det-clear-btn").addEventListener("click", function () {
+    window._sliderUserSet = {};
+    _sliderLastMoved = {};
     if (document.getElementById("filter-2tpartner")) document.getElementById("filter-2tpartner").value = "";
     document.getElementById("filter-crparty").value = "";
     el.querySelectorAll('input[type=checkbox]').forEach(function (cb) { cb.checked = false; });
@@ -444,6 +448,7 @@ function renderDetails(data) {
       var _bkTo   = document.getElementById("det-bk-to");
       if (_bkFrom && dl.bkFrom !== undefined) _bkFrom.value = dl.bkFrom;
       if (_bkTo   && dl.bkTo   !== undefined) _bkTo.value   = dl.bkTo;
+      window._sliderUserSet["det-bk"] = true;
       updateSliderDisplay("det-bk");
     }
     if (dl.rsFrom !== undefined || dl.rsTo !== undefined) {
@@ -451,6 +456,7 @@ function renderDetails(data) {
       var _rsTo   = document.getElementById("det-rs-to");
       if (_rsFrom && dl.rsFrom !== undefined) _rsFrom.value = dl.rsFrom;
       if (_rsTo   && dl.rsTo   !== undefined) _rsTo.value   = dl.rsTo;
+      window._sliderUserSet["det-rs"] = true;
       updateSliderDisplay("det-rs");
     }
     if (dl.eaFrom !== undefined || dl.eaTo !== undefined) {
@@ -458,6 +464,7 @@ function renderDetails(data) {
       var _eaTo   = document.getElementById("det-ea-to");
       if (_eaFrom && dl.eaFrom !== undefined) { _eaFrom.value = dl.eaFrom; _eaFrom.dataset.intendedValue = dl.eaFrom; }
       if (_eaTo   && dl.eaTo   !== undefined) { _eaTo.value   = dl.eaTo;   _eaTo.dataset.intendedValue   = dl.eaTo; }
+      window._sliderUserSet["det-ea"] = true;
       updateSliderDisplay("det-ea");
     }
     if (dl.expFrom !== undefined || dl.expTo !== undefined) {
@@ -465,6 +472,7 @@ function renderDetails(data) {
       var _expTo   = document.getElementById("det-exp-to");
       if (_expFrom && dl.expFrom !== undefined) _expFrom.value = dl.expFrom;
       if (_expTo   && dl.expTo   !== undefined) _expTo.value   = dl.expTo;
+      window._sliderUserSet["det-exp"] = true;
       updateSliderDisplay("det-exp");
     }
     window._detDeepLink = null;
@@ -535,6 +543,7 @@ function renderDetails(data) {
       if (slEl && st[p[1]] !== null && st[p[1]] !== undefined && st[p[1]] !== "") slEl.value = st[p[1]];
     });
     if (st.ucMissedPreset) ucMissedPreset = true;
+    if (st.sliderUserSet) window._sliderUserSet = JSON.parse(JSON.stringify(st.sliderUserSet));
     // Restore filter pane collapsed state
     if (st.filterCollapsed) {
       filterBody.classList.add("d-none");
@@ -570,16 +579,17 @@ function renderDetails(data) {
         earned:        !!(document.getElementById("filter-earned")          || {}).checked,
         ea:            !!(document.getElementById("filter-ea")              || {}).checked,
         aap:           !!(document.getElementById("filter-aap")             || {}).checked,
-        bkFrom:        (document.getElementById("det-bk-from")  || {value:null}).value,
-        bkTo:          (document.getElementById("det-bk-to")    || {value:null}).value,
-        rsFrom:        (document.getElementById("det-rs-from")  || {value:null}).value,
-        rsTo:          (document.getElementById("det-rs-to")    || {value:null}).value,
-        eaFrom:        (document.getElementById("det-ea-from")  || {value:null}).value,
-        eaTo:          (document.getElementById("det-ea-to")    || {value:null}).value,
-        expFrom:       (document.getElementById("det-exp-from") || {value:null}).value,
-        expTo:         (document.getElementById("det-exp-to")   || {value:null}).value,
+        bkFrom:        window._sliderUserSet["det-bk"]  ? (document.getElementById("det-bk-from")  || {value:null}).value : null,
+        bkTo:          window._sliderUserSet["det-bk"]  ? (document.getElementById("det-bk-to")    || {value:null}).value : null,
+        rsFrom:        window._sliderUserSet["det-rs"]  ? (document.getElementById("det-rs-from")  || {value:null}).value : null,
+        rsTo:          window._sliderUserSet["det-rs"]  ? (document.getElementById("det-rs-to")    || {value:null}).value : null,
+        eaFrom:        window._sliderUserSet["det-ea"]  ? (document.getElementById("det-ea-from")  || {value:null}).value : null,
+        eaTo:          window._sliderUserSet["det-ea"]  ? (document.getElementById("det-ea-to")    || {value:null}).value : null,
+        expFrom:       window._sliderUserSet["det-exp"] ? (document.getElementById("det-exp-from") || {value:null}).value : null,
+        expTo:         window._sliderUserSet["det-exp"] ? (document.getElementById("det-exp-to")   || {value:null}).value : null,
         csFrom:        (document.getElementById("det-cs-from")  || {value:null}).value,
         csTo:          (document.getElementById("det-cs-to")    || {value:null}).value,
+        sliderUserSet: window._sliderUserSet ? JSON.parse(JSON.stringify(window._sliderUserSet)) : {},
         filterCollapsed: filterBody ? filterBody.classList.contains("d-none") : false
       };
     }
@@ -720,9 +730,8 @@ function renderDetails(data) {
       var fromEl = document.getElementById(def.prefix + "-from");
       var toEl   = document.getElementById(def.prefix + "-to");
       if (!fromEl || !toEl) return;
-      // Only adapt bounds if this slider is fully open (user hasn't set it manually)
-      var isFullyOpen = parseInt(fromEl.value) === parseInt(fromEl.min) && parseInt(toEl.value) === parseInt(toEl.max);
-      if (!isFullyOpen) return;
+      // Skip if user has manually set this slider
+      if (window._sliderUserSet[def.prefix]) return;
       var mn = null, mx = null;
       filteredData.forEach(function(r) {
         def.get(r).forEach(function(d) {
