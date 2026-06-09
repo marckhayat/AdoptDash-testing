@@ -762,6 +762,11 @@ function restoreUploadSection(cachedEntries) {
   document.getElementById("file-input").addEventListener("change", handleFileUpload);
 
   // ── API tab toggle ────────────────────────────────────────────────────────
+  // Hide the API tab when running from GitHub Pages (proxy not available)
+  if (window.location.hostname === "marckhayat.github.io") {
+    document.getElementById("ws-tab-api").style.display = "none";
+  }
+
   document.getElementById("ws-tab-file").addEventListener("click", function() {
     this.classList.add("active");
     document.getElementById("ws-tab-api").classList.remove("active");
