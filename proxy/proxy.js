@@ -61,7 +61,7 @@ server.listen(PORT, 'localhost', () => {
       execSync(cmd);
     } catch(e) {}
   } else {
-    console.log('  Open web-app/index.html in your browser.');
+    console.log('  Open index.html in your browser.');
   }
   console.log('  Keep this window open while using the API feature.');
   console.log('  Press Ctrl+C to stop.');

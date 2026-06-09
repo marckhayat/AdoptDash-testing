@@ -65,7 +65,7 @@ if __name__ == "__main__":
         print(f"  Opening app: {url}")
         webbrowser.open(url)
     else:
-        print(f"  Open web-app/index.html in your browser.")
+        print(f"  Open index.html in your browser.")
     print("  Keep this window open while using the API feature.")
     print("  Close this window to stop the proxy.")
     try:

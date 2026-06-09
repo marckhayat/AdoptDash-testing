@@ -1,11 +1,133 @@
-<!DOCTYPE html>
-<html>
+﻿<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta http-equiv="refresh" content="0; url=web-app/index.html">
-  <title>Adoption Dashboard</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cisco Adoption Dashboard</title>
+  <link rel="icon" type="image/png" href="https://www.cisco.com/favicon.ico" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" />
+  <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
-  <script>window.location.replace("web-app/index.html");</script>
+
+  <!-- ΓöÇΓöÇ Top Navigation ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ -->
+  <nav class="navbar navbar-expand-lg navbar-dark cisco-nav px-3 py-2">
+    <a class="navbar-brand fw-bold fs-5" href="#" onclick="resetApp();return false;">
+      <i class="bi bi-bar-chart-fill me-2"></i>Adoption Dashboard
+    </a>
+    <span class="navbar-text text-white-50 small ms-2">Cisco CX Partner Organization</span>
+    <div id="status-bar" class="d-none ms-auto d-flex align-items-center gap-2">
+      <i class="bi bi-check-circle-fill text-success"></i>
+      <span class="text-white-50 small" id="status-filename"></span>
+      <span class="text-white-50 small" id="status-rows"></span>
+      <span class="text-white-50 small" id="status-date"></span>
+      <button class="btn btn-sm btn-outline-light py-0" onclick="resetApp()">
+        <i class="bi bi-arrow-repeat me-1"></i>Change file
+      </button>
+    </div>
+  </nav>
+
+  <!-- ΓöÇΓöÇ Tab bar ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ -->
+  <div class="cisco-tab-bar px-3 pt-2 d-none" id="main-tab-bar">
+    <ul class="nav nav-tabs" id="mainTabs" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="tab-overview-btn" data-bs-toggle="tab"
+          data-bs-target="#tab-overview" type="button" role="tab">
+          <i class="bi bi-grid-3x3-gap me-1"></i>Overview
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="tab-details-btn" data-bs-toggle="tab"
+          data-bs-target="#tab-details" type="button" role="tab">
+          <i class="bi bi-table me-1"></i>Details
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="tab-pvi-btn" data-bs-toggle="tab"
+          data-bs-target="#tab-pvi" type="button" role="tab">
+          <i class="bi bi-speedometer2 me-1"></i>PVI
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="tab-lifecycle-btn" data-bs-toggle="tab"
+          data-bs-target="#tab-lifecycle" type="button" role="tab">
+          <i class="bi bi-bar-chart me-1"></i>Lifecycle
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="tab-cpi-adopt-btn" data-bs-toggle="tab"
+          data-bs-target="#tab-cpi-adopt" type="button" role="tab">
+          <i class="bi bi-graph-up-arrow me-1"></i>CPI Adopt
+        </button>
+      </li>
+    </ul>
+  </div>
+
+  <!-- ΓöÇΓöÇ Notification toast container (top-right, fixed) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ -->
+  <div id="notif-toast-container" aria-live="polite" aria-atomic="false"></div>
+
+  <!-- ΓöÇΓöÇ Main Content ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ -->
+  <div class="container-fluid px-3 py-3">
+
+    <!-- Upload Section -->
+    <div id="upload-section"></div>
+
+    <!-- Multi-session picker bar (persists while a session is open) -->
+    <div id="multi-session-bar" class="d-none"></div>
+
+    <!-- Tab content panes -->
+    <div class="tab-content" id="mainTabContent">
+      <div class="tab-pane fade show active" id="tab-overview" role="tabpanel"></div>
+      <div class="tab-pane fade" id="tab-details"   role="tabpanel"></div>
+      <div class="tab-pane fade" id="tab-pvi"       role="tabpanel"></div>
+      <div class="tab-pane fade" id="tab-lifecycle" role="tabpanel"></div>
+      <div class="tab-pane fade" id="tab-cpi-adopt" role="tabpanel"></div>
+    </div>
+
+  </div><!-- /container-fluid -->
+
+  <!-- ΓöÇΓöÇ Scripts ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+  <script src="js/idb.js"></script>
+  <script src="js/fiscal.js"></script>
+  <script src="js/pvi-brackets.js"></script>
+  <script src="js/mapping.js"></script>
+  <script src="js/transform.js"></script>
+  <script src="js/ws-api.js"></script>
+  <script src="js/overview.js"></script>
+  <script src="js/details.js"></script>
+  <script src="js/pvi.js"></script>
+  <script src="js/lifecycle.js"></script>
+  <script src="js/cpi-adopt.js"></script>
+  <script src="js/main.js"></script>
+<footer class="border-top mt-4 bg-light">
+  <!-- Help/feedback banner -->
+  <div class="text-center py-3 border-bottom">
+    <a href="https://cs.co/AdoptDash" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary px-3 me-2">
+      <i class="bi bi-play-circle me-1"></i>Tutorials &amp; Community
+    </a>
+    <a href="https://cs.co/PartnerCSS" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary px-3">
+      <i class="bi bi-chat-dots me-1"></i>Submit Feedback or Request Help
+    </a>
+  </div>
+  <!-- Disclaimer + version -->
+  <div class="d-flex align-items-center justify-content-between px-3 py-2 flex-wrap gap-2 cisco-nav">
+    <div style="font-size:0.75rem">
+      <p class="mb-0" style="color:#fff">
+        <span class="fw-semibold me-1">Disclaimer:</span>This tool is independently developed and is not an official Cisco product. Provided "as is" without warranty. Partners are responsible for verifying all data and results.
+      </p>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <span id="app-version-label" style="font-size:0.78rem;white-space:nowrap;color:#9aa5b1"></span>
+    </div>
+  </div>
+</footer>
+
 </body>
 </html>

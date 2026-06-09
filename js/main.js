@@ -604,7 +604,7 @@ function restoreUploadSection(cachedEntries) {
     '<div id="ws-panel-api" class="d-none text-start">' +
     '<div class="alert alert-info py-2 px-3 small mb-3"><i class="bi bi-info-circle me-1"></i>' +
     '<strong>Requires the local proxy to be running.</strong> Start it first using ' +
-    '<code>Start Proxy (Windows).bat</code> or <code>Start Proxy (Mac).sh</code> from the web-app folder.</div>' +
+    '<code>Start Proxy (Windows).bat</code> or <code>Start Proxy (Mac).sh</code> from the app folder.</div>' +
     '<p class="text-muted small mb-3">Enter your WorkSpan API credentials to download the report directly. Credentials are used only in your browser and never stored.</p>' +
     '<p class="text-muted small mb-3"><i class="bi bi-hourglass-split me-1"></i><strong>Note:</strong> Depending on report size, this may take a few minutes.</p>' +
     '<div class="mb-2">' +
@@ -831,7 +831,7 @@ function restoreUploadSection(cachedEntries) {
       errEl.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i>' + err.message +
         (isProxyDown ? '<br/><span class="text-muted">The local proxy is not running. ' +
           'Please start it first using <strong>Start Proxy (Windows).bat</strong> or <strong>Start Proxy (Mac).sh</strong> ' +
-          'from the web-app folder.</span>' : '');
+          'from the app folder.</span>' : '');
       errEl.classList.remove("d-none");
     });
   });
