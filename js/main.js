@@ -16,7 +16,7 @@ var APP_FILE_META = null;
 var APP_FILTER_STATE = { details: null, lifecycle: null, cpiAdopt: null, customer: null };
 var APP_IS_DISTI = false;
 var APP_MULTI_SESSIONS = null; // { sessions: [...], fileMeta: {...} }
-var APP_VERSION = "v6.8.4";
+var APP_VERSION = "v6.8.5";
 // Use the browser's preferred language for date formatting (respects user's browser locale setting)
 var APP_LOCALE = navigator.language || undefined;
 // Holds a FileSystemFileHandle from showOpenFilePicker() to be persisted after load
@@ -495,7 +495,19 @@ function finishLoad(filename, rowCount, headerAutoDetected, idbType, loadedAt, f
 
   var activeTab = document.querySelector(".nav-link.active[data-bs-target]");
   renderActiveTab(activeTab ? activeTab.dataset.bsTarget : "#tab-overview");
-  if (!fromCache) window._dismissedNotifs = {};
+  // Always reset first so no dismissed state bleeds from a previous session
+  window._dismissedNotifs = {};
+  window._currentSessionKey = idbType || null;
+  if (fromCache) {
+    // Restore dismissed state only when resuming from cache
+    try {
+      var stored = localStorage.getItem(_notifStorageKey(window._currentSessionKey));
+      if (stored) window._dismissedNotifs = JSON.parse(stored);
+    } catch(e) {}
+  } else {
+    // Fresh load or refresh — clear any stale dismissed state for this session
+    try { localStorage.removeItem(_notifStorageKey(window._currentSessionKey)); } catch(e) {}
+  }
   showDataNotifications(APP_DATA);
 }
 
@@ -747,6 +759,8 @@ function restoreUploadSection(cachedEntries) {
   // Hide the API tab when running from GitHub Pages (proxy not available)
   if (window.location.hostname === "marckhayat.github.io") {
     document.getElementById("ws-tab-api").style.display = "none";
+    document.getElementById("ws-tab-file").style.cursor = "default";
+    document.getElementById("ws-tab-file").style.pointerEvents = "none";
   }
 
   document.getElementById("ws-tab-file").addEventListener("click", function() {
@@ -832,13 +846,13 @@ function restoreUploadSection(cachedEntries) {
       if (sess._transformed) {
         APP_DATA = sess._transformed;
         APP_FILE_META = APP_MULTI_SESSIONS.fileMeta;
-        finishLoad(APP_MULTI_SESSIONS.fileMeta.name + " · BE GEO ID " + sess.id, APP_DATA.length, false, "cpi-" + sess.id);
+        finishLoad(APP_MULTI_SESSIONS.fileMeta.name + " · BE GEO ID " + sess.id, APP_DATA.length, false, "cpi-" + sess.id, null, true);
       } else {
         showLoader("Processing " + sess.rows.length + " rows for " + sess.id + "…");
         setTimeout(function() {
           APP_DATA = transformData(sess.rows);
           APP_FILE_META = APP_MULTI_SESSIONS.fileMeta;
-          finishLoad(APP_MULTI_SESSIONS.fileMeta.name + " · BE GEO ID " + sess.id, APP_DATA.length, false, "cpi-" + sess.id);
+          finishLoad(APP_MULTI_SESSIONS.fileMeta.name + " · BE GEO ID " + sess.id, APP_DATA.length, false, "cpi-" + sess.id, null, true);
         }, 0);
       }
     });
@@ -867,7 +881,7 @@ function restoreUploadSection(cachedEntries) {
         APP_DATA = entry.data;
         APP_FILE_META = { name: entry.meta.filename, lastModified: entry.meta.fileLastModified ? new Date(entry.meta.fileLastModified) : null, cachedAt: entry.meta.loadedAt ? new Date(entry.meta.loadedAt) : null };
         window.APP_IS_DISTI = !!entry.meta.isDisti;
-        finishLoad(entry.meta.filename, entry.meta.rowCount, false, null, entry.meta.loadedAt, true);
+        finishLoad(entry.meta.filename, entry.meta.rowCount, false, type, entry.meta.loadedAt, true);
       }).catch(function (e) { IDB.loadAll().then(function(en){restoreUploadSection(en);}); alert("Error loading cache: " + e); });
     });
   });
@@ -890,6 +904,8 @@ function restoreUploadSection(cachedEntries) {
       // and all session cards remain visible after refresh
       refreshFromHandle(type, true).then(function () {
         hideRefreshToast();
+        // Clear dismissed notifications so fresh data shows all notifications
+        try { localStorage.removeItem(_notifStorageKey(type)); } catch(e) {}
         if (APP_MULTI_SESSIONS && type.indexOf("cpi-") === 0) APP_MULTI_SESSIONS.loadedAt = new Date().toISOString();
         IDB.loadAll().then(function(en) { restoreUploadSection(en); });
       }).catch(function () {
@@ -1319,6 +1335,8 @@ function refreshAllPreviousSessions() {
       return refreshFromHandle(type, true).catch(function (err) {
         console.warn("Refresh failed for " + type + ":", err);
       }).then(function () {
+        // Clear dismissed notifications so fresh data shows all notifications
+        try { localStorage.removeItem(_notifStorageKey(type)); } catch(e) {}
         completed++;
         updateLoaderMsg("Refreshing sessions\u2026 (" + completed + "\u00a0/\u00a0" + total + ")");
       });
@@ -1720,7 +1738,19 @@ window.resetApp        = resetApp;
 window.renderActiveTab = renderActiveTab;
 
 window._dismissedNotifs = {};
-window._dismissNotif = function(id) { window._dismissedNotifs[id] = true; };
+window._currentSessionKey = null;
+window._notifStorageKey = _notifStorageKey;
+window.showDataNotifications = showDataNotifications;
+
+function _notifStorageKey(sessionKey) {
+  return "dismissed-notifs-" + (sessionKey || "default");
+}
+window._dismissNotif = function(id) {
+  window._dismissedNotifs[id] = true;
+  try {
+    localStorage.setItem(_notifStorageKey(window._currentSessionKey), JSON.stringify(window._dismissedNotifs));
+  } catch(e) {}
+};
 
 // Navigate to Details tab with a preset filter
 window.navigateToDetails = function (preset) {

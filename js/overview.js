@@ -127,6 +127,18 @@ function renderOverview(data) {
     exportBtn.style.cssText = "font-size:0.82rem";
     exportBtn.addEventListener("click", exportOverviewToXlsx);
     headerBar.appendChild(exportBtn);
+
+    var notifBtn = document.createElement("button");
+    notifBtn.id = "ovw-show-notif-btn";
+    notifBtn.className = "btn btn-sm btn-outline-secondary";
+    notifBtn.innerHTML = '<i class="bi bi-bell me-1"></i>Show Notifications';
+    notifBtn.style.cssText = "font-size:0.82rem";
+    notifBtn.addEventListener("click", function() {
+      window._dismissedNotifs = {};
+      try { localStorage.removeItem(window._notifStorageKey && window._notifStorageKey(window._currentSessionKey)); } catch(e) {}
+      if (window.showDataNotifications) window.showDataNotifications(data);
+    });
+    headerBar.appendChild(notifBtn);
   }
 
   renderTable();
