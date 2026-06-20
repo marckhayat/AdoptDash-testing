@@ -175,6 +175,11 @@ function transformData(rawRows) {
     // Step 3: CRPartyID-Offer composite key
     r["CRPartyID-Offer"] = String(r["CR Party ID"] || "") + String(r["Track"] || "");
 
+    // Strip trailing .0 from CX Customer BU ID (CSV numeric artifact)
+    if (r["CX Customer BU ID"] !== undefined && r["CX Customer BU ID"] !== null) {
+      r["CX Customer BU ID"] = String(r["CX Customer BU ID"]).replace(/\.0+$/, "").trim();
+    }
+
     // Step 4: Current stage
     var flag = function (col) { return norm(r[col]) === "YES"; };
     if      (flag("Stage Completion Flag(Adopt)"))      r["Current stage"] = "Completed";
