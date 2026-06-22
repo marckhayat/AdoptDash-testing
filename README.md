@@ -25,8 +25,11 @@ The Adoption Dashboard helps Cisco partners:
 | **Overview** | Summary pivot by Portfolio → Offer → Use Case |
 | **Details** | Row-level deal view with inline definitions |
 | **PVI** | Partner Value Index Engagement score calculator |
-| **Lifecycle** | Offer lifecycle progression charts (last 18 months) |
-| **CPI Adopt** | Incentive performance charts — earned, potential, missed, opt-in ratios |
+| **Insights** | Analytics hub with four sub-tabs: |
+| &nbsp;&nbsp;↳ **CPI Adopt** | Incentive performance charts — earned, potential, missed, opt-in ratios |
+| &nbsp;&nbsp;↳ **Customer Analysis** | Pareto-style breakdown of customers by incentive opportunity |
+| &nbsp;&nbsp;↳ **UC Health** | Drill-down stage distribution (Portfolio → Offer → Use Case) with donut chart, KPIs, and pending task analysis |
+| &nbsp;&nbsp;↳ **Lifecycle** | Offer lifecycle progression charts (last 18 months) |
 
 ---
 
