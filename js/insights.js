@@ -197,7 +197,7 @@ function renderTesting(data) {
   html += '</div>';
 
   // Stage slider lives here (always rendered, always accessible)
-  html += '<div id="uch-cs-wrap" class="mb-4" style="display:none">';
+  html += '<div id="uch-cs-wrap" class="mb-4">';
   html += '<div class="d-flex flex-wrap gap-4 align-items-start">';
   html += '<div style="min-width:220px;max-width:300px"><div class="small text-muted mb-1">Current Stage</div>' + makeStageSliderHtml("uch-cs") + '</div>';
   html += '<div id="uch-kpi-area" class="d-flex flex-wrap gap-3 align-items-center"></div>';
@@ -729,7 +729,7 @@ function renderTesting(data) {
         else toEl.value = fromEl.value;
       }
       updateUCHStageSliderDisplay();
-      renderUCHealth();
+      if (_uchState.uc) renderUCHealth(); else renderUCHDonut();
     });
   });
   updateUCHStageSliderDisplay();
@@ -819,7 +819,6 @@ function renderTesting(data) {
           uchUpdateBreadcrumb();
           uchSlideToStep(0);
           var se = document.getElementById("uch-stats"); if (se) se.innerHTML = "";
-          var cw = document.getElementById("uch-cs-wrap"); if (cw) cw.style.display = "none";
           renderUCHDonut();
         } else if (step === "0") {
           // Back to offer panel for this portfolio
@@ -867,13 +866,10 @@ function renderTesting(data) {
     uchSaveState();
     if (!_uchState.uc) {
       var se = document.getElementById("uch-stats"); if (se) se.innerHTML = "";
-      var cw = document.getElementById("uch-cs-wrap"); if (cw) cw.style.display = "none";
     }
     // Show donut as soon as any selection is made
     var mr = document.getElementById("uch-main-row");
     if (mr) mr.style.display = "";
-    var cw2 = document.getElementById("uch-cs-wrap");
-    if (cw2) cw2.style.display = _uchState.portfolio ? "" : "none";
     renderUCHDonut();
   }
 
@@ -1003,7 +999,7 @@ function renderTesting(data) {
 
     uchSaveState();
     var uchCsWrap = document.getElementById("uch-cs-wrap");
-    if (!uc) { statsEl.innerHTML = ""; if (uchCsWrap) uchCsWrap.style.display = "none"; return; }
+    if (!uc) { statsEl.innerHTML = ""; return; }
     if (uchCsWrap) uchCsWrap.style.display = "";
 
     var seenKeys = {};
