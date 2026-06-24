@@ -107,10 +107,10 @@ function renderTesting(data) {
 
   // View switcher
   html += '<ul class="nav nav-pills mb-4" id="testing-view-tabs">';
-  html += '<li class="nav-item"><button class="nav-link active" id="tab-btn-cpi"><i class="bi bi-graph-up-arrow me-1"></i>CPI Adopt</button></li>';
-  var _newTag = new Date() < new Date('2026-06-29') ? '<span class="position-absolute text-danger fw-bold" style="top:1px;right:2px;font-size:0.5rem;line-height:1">NEW</span>' : '';
-  html += '<li class="nav-item position-relative"><button class="nav-link" id="tab-btn-pareto"><i class="bi bi-bar-chart-steps me-1"></i>Customer Analysis</button>' + _newTag + '</li>';
-  html += '<li class="nav-item position-relative"><button class="nav-link" id="tab-btn-uch"><i class="bi bi-heart-pulse me-1"></i>UC Health</button>' + _newTag + '</li>';
+  var _newTagCpi = new Date() < new Date('2026-09-28') ? '<span class="position-absolute text-danger fw-bold" style="top:1px;right:2px;font-size:0.5rem;line-height:1">NEW</span>' : '';
+  html += '<li class="nav-item position-relative"><button class="nav-link active" id="tab-btn-cpi"><i class="bi bi-graph-up-arrow me-1"></i>CPI Adopt</button>' + _newTagCpi + '</li>';
+  html += '<li class="nav-item"><button class="nav-link" id="tab-btn-pareto"><i class="bi bi-bar-chart-steps me-1"></i>Customer Analysis</button></li>';
+  html += '<li class="nav-item"><button class="nav-link" id="tab-btn-uch"><i class="bi bi-heart-pulse me-1"></i>UC Health</button></li>';
   html += '<li class="nav-item"><button class="nav-link" id="tab-btn-lifecycle"><i class="bi bi-bar-chart me-1"></i>Lifecycle</button></li>';
   html += '</ul>';
 

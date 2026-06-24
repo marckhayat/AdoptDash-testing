@@ -122,9 +122,10 @@ function renderCPIAdopt(data) {
   html += '</div>'; // inner row
   html += '</div></div>'; // card-body + card
 
+  var _newTagUC = new Date() < new Date('2026-09-28') ? '<span class="text-danger fw-bold ms-1" style="font-size:0.5rem;vertical-align:super">NEW</span>' : '';
   html += '<div class="card shadow-sm mb-2" id="cpi-row-3">';
   html += '<div class="card-header fw-semibold d-flex align-items-center justify-content-between flex-wrap gap-2">';
-  html += '<span>By Use Case <small class="fw-normal text-muted">All Time</small></span>';
+  html += '<span>By Use Case' + _newTagUC + ' <small class="fw-normal text-muted">All Time</small></span>';
   html += '<div class="d-flex align-items-center gap-3">';
   html += '<span id="cpi-chart8-total" class="fw-normal text-muted"></span>';
   html += '<div class="btn-group btn-group-sm" id="cpi-uc-mode-toggle" role="group">';
