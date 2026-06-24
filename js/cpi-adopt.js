@@ -125,14 +125,14 @@ function renderCPIAdopt(data) {
   var _newTagUC = new Date() < new Date('2026-09-28') ? '<span class="text-danger fw-bold ms-1" style="font-size:0.5rem;vertical-align:super">NEW</span>' : '';
   html += '<div class="card shadow-sm mb-2" id="cpi-row-3">';
   html += '<div class="card-header fw-semibold d-flex align-items-center justify-content-between flex-wrap gap-2">';
-  html += '<span>By Use Case' + _newTagUC + ' <small class="fw-normal text-muted">All Time</small></span>';
+  html += '<span>By Use Case' + _newTagUC + ' <small class="fw-normal text-muted">All Time</small> <i class="bi bi-info-circle text-muted" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Number of opt-ins or estimated amount of earned incentives per use case."></i></span>';
   html += '<div class="d-flex align-items-center gap-3">';
   html += '<span id="cpi-chart8-total" class="fw-normal text-muted"></span>';
   html += '<div class="btn-group btn-group-sm" id="cpi-uc-mode-toggle" role="group">';
   html += '<button type="button" class="btn btn-outline-primary active" data-ucmode="optins"># Opt-ins</button>';
   html += '<button type="button" class="btn btn-outline-primary" data-ucmode="earned">Est. Earned</button>';
   html += '</div></div></div>';
-  html += '<div class="card-body p-3" style="min-height:400px;height:400px"><canvas id="cpi-chart8"></canvas></div>';
+  html += '<div class="card-body p-3" style="min-height:500px;height:500px"><canvas id="cpi-chart8"></canvas></div>';
   html += '</div>';
 
   el.innerHTML = html;
@@ -1029,11 +1029,11 @@ function renderCPIAdopt(data) {
       type: "bar",
       data: { labels: ucList, datasets: datasets },
       options: {
+        indexAxis: "y",
         responsive: true,
         maintainAspectRatio: false,
         scales: {
-          x: { stacked: true, grid: { display: false }, ticks: { maxRotation: 45, minRotation: 30 } },
-          y: {
+          x: {
             stacked: true,
             beginAtZero: true,
             ticks: isOptins
@@ -1045,7 +1045,8 @@ function renderCPIAdopt(data) {
                   }
                 },
             title: { display: true, text: isOptins ? "# Opt-ins" : "Est. Earned ($)" }
-          }
+          },
+          y: { stacked: true, grid: { display: false }, ticks: { font: { size: 11 } } }
         },
         plugins: {
           legend: { position: "bottom" },
