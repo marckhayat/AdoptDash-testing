@@ -10,7 +10,9 @@ var _cpiChart4 = null;
 var _cpiChart5 = null;
 var _cpiChart6 = null;
 var _cpiChart7 = null;
+var _cpiChart8 = null;
 var _cpiChart5Log = false;
+var _cpiChart8Mode = "optins";
 
 function renderCPIAdopt(data) {
   var el = document.getElementById("tab-cpi-adopt");
@@ -67,7 +69,7 @@ function renderCPIAdopt(data) {
   html += '</select></div>';
   html += '</div>';
 
-  html += '<div class="row g-4 mb-4">';
+  html += '<div class="row g-4 mb-4" id="cpi-row-1">';
 
   // ── Stat charts row: Eligible-only pie | Eligible+Expired pie | Earned by Portfolio
   html += '<div class="col-12 col-lg-4">';
@@ -89,7 +91,7 @@ function renderCPIAdopt(data) {
   html += '</div>'; // stat charts row
 
   // ── Monthly charts group with shared FY toggle
-  html += '<div class="card shadow-sm mb-2">';
+  html += '<div class="card shadow-sm mb-2" id="cpi-row-2">';
   html += '<div class="card-header fw-semibold d-flex align-items-center justify-content-between flex-wrap gap-2">';
   html += '<span>Monthly Trends <small class="fw-normal">for Opted-in UCs</small></span>';
   html += '<div class="d-flex align-items-center gap-2">';
@@ -120,7 +122,66 @@ function renderCPIAdopt(data) {
   html += '</div>'; // inner row
   html += '</div></div>'; // card-body + card
 
+  html += '<div class="card shadow-sm mb-2" id="cpi-row-3">';
+  html += '<div class="card-header fw-semibold d-flex align-items-center justify-content-between flex-wrap gap-2">';
+  html += '<span>By Use Case <small class="fw-normal text-muted">All Time</small></span>';
+  html += '<div class="d-flex align-items-center gap-3">';
+  html += '<span id="cpi-chart8-total" class="fw-normal text-muted"></span>';
+  html += '<div class="btn-group btn-group-sm" id="cpi-uc-mode-toggle" role="group">';
+  html += '<button type="button" class="btn btn-outline-primary active" data-ucmode="optins"># Opt-ins</button>';
+  html += '<button type="button" class="btn btn-outline-primary" data-ucmode="earned">Est. Earned</button>';
+  html += '</div></div></div>';
+  html += '<div class="card-body p-3" style="min-height:400px;height:400px"><canvas id="cpi-chart8"></canvas></div>';
+  html += '</div>';
+
   el.innerHTML = html;
+
+  // ── Scroll dot navigator ───────────────────────────────────────────────────
+  (function() {
+    var rows = [
+      { id: "cpi-row-1", label: "Incentive Overview" },
+      { id: "cpi-row-2", label: "Monthly Trends" },
+      { id: "cpi-row-3", label: "By Use Case" }
+    ];
+    var nav = document.createElement("div");
+    nav.id = "cpi-scroll-nav";
+    nav.style.cssText = "position:fixed;left:12px;top:50%;transform:translateY(-50%);z-index:999;display:flex;flex-direction:column;gap:10px;";
+    rows.forEach(function(r, i) {
+      var dot = document.createElement("div");
+      dot.dataset.target = r.id;
+      dot.title = r.label;
+      dot.style.cssText = "width:10px;height:10px;border-radius:50%;background:#ccc;cursor:pointer;transition:background 0.2s,transform 0.2s;";
+      dot.addEventListener("mouseenter", function() { if (dot.style.background !== "rgb(0, 114, 198)") dot.style.background = "#888"; });
+      dot.addEventListener("mouseleave", function() { if (dot.style.background !== "rgb(0, 114, 198)") dot.style.background = "#ccc"; });
+      dot.addEventListener("click", function() {
+        var target = document.getElementById(r.id);
+        if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+      nav.appendChild(dot);
+    });
+    // Remove old nav if re-rendering
+    var old = document.getElementById("cpi-scroll-nav");
+    if (old) old.remove();
+    document.body.appendChild(nav);
+
+    // Highlight active dot via IntersectionObserver
+    var dots = nav.querySelectorAll("div");
+    var observer = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        var idx = rows.findIndex(function(r) { return r.id === entry.target.id; });
+        if (idx === -1) return;
+        dots[idx].style.background    = entry.isIntersecting ? "#0072C6" : "#ccc";
+        dots[idx].style.transform     = entry.isIntersecting ? "scale(1.4)" : "scale(1)";
+      });
+    }, { threshold: 0.3 });
+    rows.forEach(function(r) {
+      var el2 = document.getElementById(r.id);
+      if (el2) observer.observe(el2);
+    });
+
+    // Clean up when tab changes
+    el.addEventListener("remove", function() { observer.disconnect(); nav.remove(); }, { once: true });
+  })();
 
   // Initialise tooltips
   el.querySelectorAll("[data-bs-toggle='tooltip']").forEach(function (t) { new bootstrap.Tooltip(t, { html: false }); });
@@ -191,6 +252,15 @@ function renderCPIAdopt(data) {
     buildMonthlyCharts(document.getElementById("cpi-portfolio").value, document.getElementById("cpi-offer").value);
   });
 
+  document.getElementById("cpi-uc-mode-toggle").addEventListener("click", function (e) {
+    var btn = e.target.closest("button[data-ucmode]");
+    if (!btn) return;
+    _cpiChart8Mode = btn.dataset.ucmode;
+    if (window.APP_FILTER_STATE && window.APP_FILTER_STATE.cpiAdopt) window.APP_FILTER_STATE.cpiAdopt.ucMode = _cpiChart8Mode;
+    this.querySelectorAll("button").forEach(function (b) { b.classList.toggle("active", b.dataset.ucmode === _cpiChart8Mode); });
+    buildUCChart(document.getElementById("cpi-portfolio").value, document.getElementById("cpi-offer").value);
+  });
+
   // Restore persisted filter state
   var _cpiSaved = window.APP_FILTER_STATE && window.APP_FILTER_STATE.cpiAdopt;
   if (_cpiSaved) {
@@ -213,6 +283,11 @@ function renderCPIAdopt(data) {
       var _logEl = document.getElementById("cpi-log-toggle");
       if (_logEl) _logEl.checked = true;
     }
+    if (_cpiSaved.ucMode) {
+      _cpiChart8Mode = _cpiSaved.ucMode;
+      var _ucToggleEl = document.getElementById("cpi-uc-mode-toggle");
+      if (_ucToggleEl) _ucToggleEl.querySelectorAll("button").forEach(function (b) { b.classList.toggle("active", b.dataset.ucmode === _cpiChart8Mode); });
+    }
   }
 
   buildCharts(
@@ -223,10 +298,11 @@ function renderCPIAdopt(data) {
   function buildCharts(portfolioFilter, offerFilter) {
     if (window.APP_FILTER_STATE) {
       var _prevIncentiveMode = window.APP_FILTER_STATE.cpiAdopt && window.APP_FILTER_STATE.cpiAdopt.incentiveMode;
-      window.APP_FILTER_STATE.cpiAdopt = { portfolio: portfolioFilter, offer: offerFilter, selectedFY: _selectedFY, logScale: _cpiChart5Log, incentiveMode: _prevIncentiveMode || "eligible" };
+      window.APP_FILTER_STATE.cpiAdopt = { portfolio: portfolioFilter, offer: offerFilter, selectedFY: _selectedFY, logScale: _cpiChart5Log, incentiveMode: _prevIncentiveMode || "eligible", ucMode: _cpiChart8Mode };
     }
     buildStatCharts(portfolioFilter, offerFilter);
     buildMonthlyCharts(portfolioFilter, offerFilter);
+    buildUCChart(portfolioFilter, offerFilter);
   }
 
   function buildStatCharts(portfolioFilter, offerFilter) {
@@ -851,6 +927,133 @@ function renderCPIAdopt(data) {
             callbacks: {
               label: function (ctx) {
                 var v = ctx.raw;
+                var fmt = Math.abs(v) >= 1000000 ? "$"+(v/1000000).toFixed(2)+"M"
+                        : Math.abs(v) >= 1000    ? "$"+(v/1000).toFixed(1)+"K"
+                        : "$"+Math.round(v).toLocaleString();
+                return ctx.dataset.label + ": " + fmt;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  function buildUCChart(portfolioFilter, offerFilter) {
+    var PORTFOLIO_COLORS = {
+      "Networking":               "#00BCF2",
+      "Security":                 "#E55400",
+      "Cloud + AI Infrastructure":"#6BB700",
+      "Collaboration":            "#7B3F91"
+    };
+    var EARN_STAGES_UC = [
+      { flagField: "Stage Completion Flag(onboard)", dateField: "Stage Completion Date(onboard)", amtField: "Estimated Incentive Amount(Onboard)" },
+      { flagField: "Stage Completion Flag(Use)",     dateField: "Stage Completion Date(Use)",     amtField: "Estimated Incentive Amount(Use)"     },
+      { flagField: "Stage Completion Flag(Engage)",  dateField: "Stage Completion Date(Engage)",  amtField: "Estimated Incentive Amount(Engage)"  },
+      { flagField: "Stage Completion Flag(Adopt)",   dateField: "Stage Completion Date(Adopt)",   amtField: "Estimated Incentive Amount(Adopt)"   }
+    ];
+
+    var isOptins = (_cpiChart8Mode === "optins");
+    var ucPfMap = {}; // { uc: { portfolio: value } }
+
+    data.forEach(function (r) {
+      if (norm(r["Maximum Incentive Deal Flag"]) !== "YES") return;
+      if (portfolioFilter && r["Deal CPI Portfolio"] !== portfolioFilter) return;
+      if (offerFilter     && r["Track"] !== offerFilter) return;
+      var uc = r["Sub-Track"] || "(No UC)";
+      var p  = r["Deal CPI Portfolio"] || "(No Portfolio)";
+
+      if (isOptins) {
+        var st = norm(r["Stage"]);
+        if (st !== "ELIGIBLE" && st !== "EXPIRED") return;
+        if (norm(r["Adopt Rebate Opt-In Status"]) !== "OPTED IN") return;
+        if (!ucPfMap[uc]) ucPfMap[uc] = {};
+        ucPfMap[uc][p] = (ucPfMap[uc][p] || 0) + 1;
+      } else {
+        if (!r["Earned?"]) return;
+        var lciStart = new Date(r["Adopt Rebate Start Date"]);
+        var expiry   = new Date(r["Deal Incentive Expiry Date"]);
+        if (isNaN(lciStart.getTime()) || isNaN(expiry.getTime())) return;
+        EARN_STAGES_UC.forEach(function (s) {
+          if (norm(r[s.flagField]) !== "YES") return;
+          var d = new Date(r[s.dateField]);
+          if (isNaN(d.getTime()) || d < lciStart || d > expiry) return;
+          var amt = parseFloat(r[s.amtField]) || 0;
+          if (amt === 0) return;
+          if (!ucPfMap[uc]) ucPfMap[uc] = {};
+          ucPfMap[uc][p] = (ucPfMap[uc][p] || 0) + amt;
+        });
+      }
+    });
+
+    // Sort UCs by portfolio order, then by value descending within portfolio
+    var PF_ORDER = ["Networking", "Security", "Cloud + AI Infrastructure", "Collaboration"];
+    var ucList = Object.keys(ucPfMap).sort(function (a, b) {
+      var pa = PF_ORDER.indexOf(Object.keys(ucPfMap[a])[0]); if (pa === -1) pa = 999;
+      var pb = PF_ORDER.indexOf(Object.keys(ucPfMap[b])[0]); if (pb === -1) pb = 999;
+      if (pa !== pb) return pa - pb;
+      var va = Object.values(ucPfMap[a]).reduce(function (s, v) { return s + v; }, 0);
+      var vb = Object.values(ucPfMap[b]).reduce(function (s, v) { return s + v; }, 0);
+      return vb - va;
+    });
+
+    var pfList = portfolioFilter ? [portfolioFilter] : portfolios;
+    var fallback = ["#00BCF2","#E55400","#6BB700","#7B3F91","#FF8C00","#005B99"];
+    var datasets = pfList.map(function (p, idx) {
+      return {
+        label: p,
+        data: ucList.map(function (uc) { return (ucPfMap[uc] && ucPfMap[uc][p]) || 0; }),
+        backgroundColor: PORTFOLIO_COLORS[p] || fallback[idx % fallback.length],
+        stack: "s"
+      };
+    });
+
+    // Compute grand total
+    var grandTotal = ucList.reduce(function (s, uc) {
+      return s + Object.values(ucPfMap[uc]).reduce(function (s2, v) { return s2 + v; }, 0);
+    }, 0);
+    var totalEl = document.getElementById("cpi-chart8-total");
+    if (totalEl) {
+      var totalFmt = isOptins ? grandTotal.toLocaleString() + " opt-in" + (grandTotal !== 1 ? "s" : "")
+        : (Math.abs(grandTotal) >= 1000000 ? "$"+(grandTotal/1000000).toFixed(2)+"M"
+          : Math.abs(grandTotal) >= 1000 ? "$"+(grandTotal/1000).toFixed(1)+"K"
+          : "$"+Math.round(grandTotal).toLocaleString());
+      totalEl.textContent = "Total: " + totalFmt;
+      totalEl.style.fontSize = "1rem"; totalEl.style.fontWeight = "600"; totalEl.style.color = "#555";
+    }
+
+    if (_cpiChart8) { _cpiChart8.destroy(); _cpiChart8 = null; }
+    var ctx8 = document.getElementById("cpi-chart8").getContext("2d");
+    _cpiChart8 = new Chart(ctx8, {
+      type: "bar",
+      data: { labels: ucList, datasets: datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: { stacked: true, grid: { display: false }, ticks: { maxRotation: 45, minRotation: 30 } },
+          y: {
+            stacked: true,
+            beginAtZero: true,
+            ticks: isOptins
+              ? { precision: 0 }
+              : { callback: function (v) {
+                    if (Math.abs(v) >= 1000000) return "$"+(v/1000000).toFixed(1)+"M";
+                    if (Math.abs(v) >= 1000)    return "$"+(v/1000).toFixed(0)+"K";
+                    return "$"+Math.round(v).toLocaleString();
+                  }
+                },
+            title: { display: true, text: isOptins ? "# Opt-ins" : "Est. Earned ($)" }
+          }
+        },
+        plugins: {
+          legend: { position: "bottom" },
+          tooltip: {
+            callbacks: {
+              label: function (ctx) {
+                var v = ctx.raw;
+                if (!v) return null;
+                if (isOptins) return ctx.dataset.label + ": " + v + " opt-in" + (v !== 1 ? "s" : "");
                 var fmt = Math.abs(v) >= 1000000 ? "$"+(v/1000000).toFixed(2)+"M"
                         : Math.abs(v) >= 1000    ? "$"+(v/1000).toFixed(1)+"K"
                         : "$"+Math.round(v).toLocaleString();

@@ -47,6 +47,10 @@ function init() {
   document.querySelectorAll('[data-bs-toggle="tab"]').forEach(function (tab) {
     tab.addEventListener("shown.bs.tab", function (e) {
       if (!APP_DATA) return;
+      if (e.target.dataset.bsTarget !== "#tab-testing") {
+        var nav = document.getElementById("cpi-scroll-nav");
+        if (nav) nav.remove();
+      }
       renderActiveTab(e.target.dataset.bsTarget);
     });
   });
@@ -1784,6 +1788,8 @@ function resetApp() {
   sb.classList.remove("d-flex");
   sb.classList.add("d-none");
   document.getElementById("main-tab-bar").classList.add("d-none");
+  var cpiNav = document.getElementById("cpi-scroll-nav");
+  if (cpiNav) cpiNav.remove();
 
   // Clear notifications
   var notifC = document.getElementById("notif-toast-container");

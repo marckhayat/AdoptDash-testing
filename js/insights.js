@@ -1172,11 +1172,16 @@ function renderTesting(data) {
     renderCPIAdopt(getEffectiveData());
   });
   document.getElementById("tab-btn-pareto").addEventListener("click", function() {
+    var nav = document.getElementById("cpi-scroll-nav"); if (nav) nav.remove();
     showSubView("pareto");
     renderPareto();
   });
-  document.getElementById("tab-btn-uch").addEventListener("click", function() { showSubView("uch"); });
+  document.getElementById("tab-btn-uch").addEventListener("click", function() {
+    var nav = document.getElementById("cpi-scroll-nav"); if (nav) nav.remove();
+    showSubView("uch");
+  });
   document.getElementById("tab-btn-lifecycle").addEventListener("click", function() {
+    var nav = document.getElementById("cpi-scroll-nav"); if (nav) nav.remove();
     showSubView("lifecycle");
     renderLifecycle(getEffectiveData());
   });
