@@ -232,6 +232,7 @@ function renderDetails(data) {
       }
 
       Promise.all(saves).then(function () {
+        if (document.activeElement) document.activeElement.blur();
         bsModal.hide();
         applyFiltersAndRender();
         rebuildTagFilterUI();
