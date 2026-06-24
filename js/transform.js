@@ -167,7 +167,7 @@ function transformData(rawRows) {
     // Step 2b: Fix portfolio when set to "No Offer" — look up by offer, then by use case
     if (norm(r["Deal CPI Portfolio"]) === "NO OFFER" || norm(r["Deal CPI Portfolio"]) === "") {
       var offerKey   = norm(r["Track"]);
-      var ucKey      = norm(r["Use Case"] || r["Use case"] || "");
+      var ucKey      = norm(r["Sub-Track"] || r["Use Case"] || r["Use case"] || "");
       var fixedPortfolio = OFFER_TO_PORTFOLIO[offerKey] || USE_CASE_TO_PORTFOLIO[ucKey] || r["Deal CPI Portfolio"];
       r["Deal CPI Portfolio"] = fixedPortfolio;
     }
