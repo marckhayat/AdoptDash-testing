@@ -868,13 +868,13 @@ function restoreUploadSection(cachedEntries) {
       if (sess._transformed) {
         APP_DATA = sess._transformed;
         APP_FILE_META = APP_MULTI_SESSIONS.fileMeta;
-        finishLoad(APP_MULTI_SESSIONS.fileMeta.name + " · BE GEO ID " + sess.id, APP_DATA.length, false, "cpi-" + sess.id, null, true);
+        finishLoad(APP_MULTI_SESSIONS.fileMeta.name + " · BE GEO ID " + sess.id, APP_DATA.length, false, "cpi-" + sess.id, APP_MULTI_SESSIONS.loadedAt, true);
       } else {
         showLoader("Processing " + sess.rows.length + " rows for " + sess.id + "…");
         setTimeout(function() {
           APP_DATA = transformData(sess.rows);
           APP_FILE_META = APP_MULTI_SESSIONS.fileMeta;
-          finishLoad(APP_MULTI_SESSIONS.fileMeta.name + " · BE GEO ID " + sess.id, APP_DATA.length, false, "cpi-" + sess.id, null, true);
+          finishLoad(APP_MULTI_SESSIONS.fileMeta.name + " · BE GEO ID " + sess.id, APP_DATA.length, false, "cpi-" + sess.id, APP_MULTI_SESSIONS.loadedAt, true);
         }, 0);
       }
     });
