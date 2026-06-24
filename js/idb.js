@@ -12,7 +12,7 @@
 
 var IDB = (function () {
   var DB_NAME      = "AdoptionDashboard";
-  var DB_VERSION   = 3;
+  var DB_VERSION   = 4;
   var STORE        = "datasets";
   var HANDLE_STORE = "fileHandles";
   var ANNOT_STORE  = "annotations";

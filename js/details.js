@@ -235,6 +235,9 @@ function renderDetails(data) {
         bsModal.hide();
         applyFiltersAndRender();
         rebuildTagFilterUI();
+      }).catch(function (err) {
+        console.error("[AdoptDash] Annotation save failed:", err);
+        alert("Could not save annotation. Please refresh the page and try again.\n\n" + (err && err.message ? err.message : err));
       });
     });
 
