@@ -12,7 +12,7 @@ var _cpiChart6 = null;
 var _cpiChart7 = null;
 var _cpiChart8 = null;
 var _cpiChart5Log = false;
-var _cpiChart8Mode = "optins";
+var _cpiChart8Mode = "optins"; // "optins" | "earned"
 
 function renderCPIAdopt(data) {
   var el = document.getElementById("tab-cpi-adopt");
@@ -102,7 +102,10 @@ function renderCPIAdopt(data) {
   html += '<div class="row g-4">';
 
   html += '<div class="col-12 col-lg-4">';
-  html += '<div class="fw-semibold small mb-2">Opt-in <i class="bi bi-info-circle text-muted" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Number of opt-ins during the selected fiscal year."></i></div>';
+  html += '<div class="fw-semibold small mb-2 d-flex justify-content-between align-items-center">';
+  html += '<span>Opt-in <i class="bi bi-info-circle text-muted" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Number of opt-ins during the selected fiscal year."></i></span>';
+  html += '<span id="cpi-chart3-total" class="text-muted fw-normal"></span>';
+  html += '</div>';
   html += '<div class="chart-container" style="min-height:260px;height:260px"><canvas id="cpi-chart3"></canvas></div>';
   html += '</div>';
 
@@ -122,17 +125,17 @@ function renderCPIAdopt(data) {
   html += '</div>'; // inner row
   html += '</div></div>'; // card-body + card
 
-  var _newTagUC = new Date() < new Date('2026-09-28') ? '<span class="text-danger fw-bold ms-1" style="font-size:0.5rem;vertical-align:super">NEW</span>' : '';
+  // ── By Use Case chart (all-time)
   html += '<div class="card shadow-sm mb-2" id="cpi-row-3">';
   html += '<div class="card-header fw-semibold d-flex align-items-center justify-content-between flex-wrap gap-2">';
-  html += '<span>By Use Case' + _newTagUC + ' <small class="fw-normal text-muted">All Time</small> <i class="bi bi-info-circle text-muted" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Number of opt-ins or estimated amount of earned incentives per use case."></i></span>';
+  html += '<span>By Use Case <small class="fw-normal text-muted">All Time</small> <i class="bi bi-info-circle text-muted" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Number of opt-ins or estimated amount of earned incentives per use case."></i></span>';
   html += '<div class="d-flex align-items-center gap-3">';
   html += '<span id="cpi-chart8-total" class="fw-normal text-muted"></span>';
   html += '<div class="btn-group btn-group-sm" id="cpi-uc-mode-toggle" role="group">';
   html += '<button type="button" class="btn btn-outline-primary active" data-ucmode="optins"># Opt-ins</button>';
   html += '<button type="button" class="btn btn-outline-primary" data-ucmode="earned">Est. Earned</button>';
   html += '</div></div></div>';
-  html += '<div class="card-body p-3" style="min-height:500px;height:500px"><canvas id="cpi-chart8"></canvas></div>';
+  html += '<div class="card-body p-3" style="min-height:400px;height:400px"><canvas id="cpi-chart8"></canvas></div>';
   html += '</div>';
 
   el.innerHTML = html;
@@ -201,16 +204,17 @@ function renderCPIAdopt(data) {
     DATE_FIELDS_FOR_FY.forEach(function (f) {
       var d = new Date(r[f]);
       if (isNaN(d.getTime())) return;
-      // FY year: if month >= July (7), FY = year+1, else FY = year
-      var fy = d.getMonth() >= 7 ? d.getFullYear() + 1 : d.getFullYear();
-      fyYears.add(fy);
+      var fc = window.getFiscalMonth(d);
+      if (fc) fyYears.add(parseInt("20" + fc.fy.slice(2), 10));
     });
   });
   var fyList = Array.from(fyYears).sort(function (a, b) { return a - b; }); // ascending (oldest left, newest right)
 
-  // Determine current FY
+  // Determine current FY using the Cisco fiscal calendar
   var _now = new Date();
-  var _currentFY = _now.getMonth() >= 7 ? _now.getFullYear() + 1 : _now.getFullYear();
+  var _nowFc = window.getFiscalMonth(_now);
+  var _currentFY = _nowFc ? parseInt("20" + _nowFc.fy.slice(2), 10)
+                           : (_now.getMonth() >= 7 ? _now.getFullYear() + 1 : _now.getFullYear());
   var _selectedFY = fyList.indexOf(_currentFY) !== -1 ? _currentFY : (fyList[0] || _currentFY);
 
   // Build FY toggle buttons
@@ -673,16 +677,16 @@ function renderCPIAdopt(data) {
       "Collaboration":            "#7B3F91"
     };
 
-    // Build 12 month buckets for the selected FY (Aug → Jul)
-    // FY N: months Aug(N-1), Sep(N-1), ..., Jul(N)
-    var fyStartYear = _selectedFY - 1; // Aug of this year starts the FY
-    var monthLabels = [];
-    var monthStarts = [];
-    for (var mi = 0; mi < 12; mi++) {
-      var mDate = new Date(fyStartYear, 7 + mi, 1); // month 7 = August; JS Date handles overflow into next year
-      monthLabels.push(mDate.toLocaleString("default", { month: "short" }) + " '" + String(mDate.getFullYear()).slice(-2));
-      monthStarts.push(mDate);
-    }
+    // Build 12 fiscal month buckets for the selected FY using the Cisco fiscal calendar
+    var fyKey = "FY" + String(_selectedFY).slice(-2);
+    var fiscalMonths = (window.FISCAL_CALENDAR || [])
+      .filter(function(fc) { return fc.fy === fyKey; })
+      .sort(function(a, b) { return a.fm - b.fm; });
+    // Label each bucket by the calendar month at the midpoint of the fiscal period
+    var monthLabels = fiscalMonths.map(function(fc) {
+      var mid = new Date((fc.start.getTime() + fc.end.getTime()) / 2);
+      return mid.toLocaleString("default", { month: "short" }) + " '" + String(mid.getFullYear()).slice(-2);
+    });
 
     // Deals: MaxFlag=YES, Stage ELIGIBLE or EXPIRED, opted-in, apply offer filter
     var trendPortfolios = portfolioFilter ? [portfolioFilter] : portfolios;
@@ -699,12 +703,17 @@ function renderCPIAdopt(data) {
       if (!p || !trendCounts[p]) return;
       var d = new Date(r["Adopt Rebate Start Date"]);
       if (isNaN(d.getTime())) return;
-      for (var i = 0; i < 12; i++) {
-        var start = monthStarts[i];
-        var end   = new Date(start.getFullYear(), start.getMonth() + 1, 1);
-        if (d >= start && d < end) { trendCounts[p][i]++; break; }
+      for (var i = 0; i < fiscalMonths.length; i++) {
+        if (d >= fiscalMonths[i].start && d <= fiscalMonths[i].end) { trendCounts[p][i]++; break; }
       }
     });
+
+    // Compute grand total across all portfolios and months, then display it
+    var trendTotal = trendPortfolios.reduce(function (sum, p) {
+      return sum + trendCounts[p].reduce(function (s, v) { return s + v; }, 0);
+    }, 0);
+    var totalEl = document.getElementById("cpi-chart3-total");
+    if (totalEl) { totalEl.textContent = "Total: " + trendTotal.toLocaleString(); totalEl.style.fontSize = "1rem"; totalEl.style.fontWeight = "600"; totalEl.style.color = "#555"; }
 
     var trendDatasets = trendPortfolios.map(function (p, idx) {
       var fallbackColors = ["#00BCF2","#E55400","#6BB700","#7B3F91","#FF8C00","#005B99"];
@@ -782,11 +791,10 @@ function renderCPIAdopt(data) {
       });
       if (completionDates.length === 0) return;
 
-      // For each month bucket, count this deal at most once if any completion date falls in it
-      for (var i = 0; i < 12; i++) {
-        var start = monthStarts[i];
-        var end   = new Date(start.getFullYear(), start.getMonth() + 1, 1);
-        var progressed = completionDates.some(function (d) { return d >= start && d < end; });
+      // For each fiscal month bucket, count this deal at most once if any completion date falls in it
+      for (var i = 0; i < fiscalMonths.length; i++) {
+        var fmStart = fiscalMonths[i].start, fmEnd = fiscalMonths[i].end;
+        var progressed = completionDates.some(function (d) { return d >= fmStart && d <= fmEnd; });
         if (progressed) progCounts[p][i]++;
       }
     });
@@ -866,10 +874,8 @@ function renderCPIAdopt(data) {
         if (d < lciStart || d > expiry) return;
         var amt = parseFloat(r[s.amtField]) || 0;
         if (amt === 0) return;
-        for (var i = 0; i < 12; i++) {
-          var start = monthStarts[i];
-          var end   = new Date(start.getFullYear(), start.getMonth() + 1, 1);
-          if (d >= start && d < end) { earnedByPortfolio[p][i] += amt; break; }
+        for (var i = 0; i < fiscalMonths.length; i++) {
+          if (d >= fiscalMonths[i].start && d <= fiscalMonths[i].end) { earnedByPortfolio[p][i] += amt; break; }
         }
       });
     });
@@ -1033,6 +1039,7 @@ function renderCPIAdopt(data) {
         responsive: true,
         maintainAspectRatio: false,
         scales: {
+          y: { stacked: true, grid: { display: false }, ticks: { font: { size: 11 } } },
           x: {
             stacked: true,
             beginAtZero: true,
@@ -1045,8 +1052,7 @@ function renderCPIAdopt(data) {
                   }
                 },
             title: { display: true, text: isOptins ? "# Opt-ins" : "Est. Earned ($)" }
-          },
-          y: { stacked: true, grid: { display: false }, ticks: { font: { size: 11 } } }
+          }
         },
         plugins: {
           legend: { position: "bottom" },
