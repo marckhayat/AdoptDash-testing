@@ -1100,15 +1100,30 @@ function renderTesting(data) {
       return;
     }
 
+    var funnelWidthPx = Math.max(240, container.clientWidth || 260);
+    var measureCanvas = document.createElement("canvas");
+    var measureCtx = measureCanvas.getContext("2d");
+    var canMeasureText = !!measureCtx;
+    if (measureCtx) {
+      measureCtx.font = "600 10px sans-serif";
+    }
     var fh = '<div style="padding:8px 0;width:100%;">';
     funnelRows.forEach(function(row) {
       var pct    = total > 0 ? Math.round(row.count / total * 100) : 0;
       var widPct = total > 0 ? Math.max(2, Math.round(row.count / total * 100)) : 100;
       var tooltip = row.label === "All Eligible Opted-in" ? row.label : row.label.replace(" \u2713", " completed");
-      // Estimate whether label fits inside the bar.
-      // Card ~col-lg-3 ≈ 260px wide. Label ≈ 6.5px/char + ~55px for count.
-      var labelFits = (widPct / 100 * 260) >= (row.label.length * 6.5 + 55);
-      var narrow = !labelFits;
+      var countText = row.count + " (" + pct + "%)";
+      var barInnerWidth = (funnelWidthPx * widPct / 100) - 16;
+      var narrow;
+      if (canMeasureText) {
+        var labelWidth = measureCtx.measureText(row.label).width;
+        measureCtx.font = "10px sans-serif";
+        var countWidth = measureCtx.measureText(countText).width;
+        measureCtx.font = "600 10px sans-serif";
+        narrow = (labelWidth + countWidth + 14) > barInnerWidth;
+      } else {
+        narrow = (widPct / 100 * funnelWidthPx) < (row.label.length * 6.5 + 55);
+      }
       // Row wrapper — bar is absolutely centered, label pinned to its right edge
       fh += '<div style="position:relative;width:100%;height:26px;margin-bottom:3px;" title="' + escHtml(tooltip) + ': ' + row.count + ' deals (' + pct + '%)">';
       // Centered colored bar
