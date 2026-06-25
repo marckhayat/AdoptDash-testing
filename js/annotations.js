@@ -144,7 +144,7 @@ var ANNOTATIONS = (function () {
           csvEscape(r.comment || "")
         ].join(","));
       });
-      var blob = new Blob([lines.join("\r\n")], { type: "text/csv" });
+      var blob = new Blob(["\uFEFF" + lines.join("\r\n")], { type: "text/csv;charset=utf-8;" });
       var url  = URL.createObjectURL(blob);
       var a    = document.createElement("a");
       a.href     = url;
@@ -162,7 +162,8 @@ var ANNOTATIONS = (function () {
       var reader = new FileReader();
       reader.onload = function (e) {
         try {
-          var lines = e.target.result.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+          var raw   = e.target.result.replace(/^\uFEFF/, ""); // strip UTF-8 BOM if present
+          var lines = raw.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
           if (lines.length < 2) throw new Error("File appears empty");
           var header   = csvParseLine(lines[0]).map(function (h) { return h.trim().toLowerCase(); });
           var iWsId    = header.indexOf("ws deal id");
@@ -189,7 +190,7 @@ var ANNOTATIONS = (function () {
         } catch (err) { reject(err); }
       };
       reader.onerror = reject;
-      reader.readAsText(file);
+      reader.readAsText(file, "UTF-8");
     });
   }
 
@@ -249,4 +250,4 @@ var ANNOTATIONS = (function () {
     allTagNames:            allTagNames,
     tagColor:               tagColor
   };
-})();
+})();
