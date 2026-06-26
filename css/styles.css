@@ -404,6 +404,11 @@
   color: #174ea6;
   border: 1px solid #c5d5f8;
 }
+
+/* ALL / ANY toggle next to Tags filter label */
+.tag-mode-toggle           { display: inline-flex; border: 1px solid #c5d5f8; border-radius: 6px; overflow: hidden; vertical-align: middle; }
+.tag-mode-btn              { font-size: 0.65rem; font-weight: 700; padding: 1px 6px; border: none; background: transparent; color: #6c757d; cursor: pointer; line-height: 1.4; }
+.tag-mode-btn.active       { background: #174ea6; color: #fff; }
 .annot-cell               { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; min-width: 70px; }
 .annot-has-comment        { color: #0070d2; font-size: 0.78rem; cursor: default; }
 .annot-edit-btn           { color: #aaa !important; line-height: 1; }

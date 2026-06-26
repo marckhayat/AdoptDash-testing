@@ -69,7 +69,8 @@ function renderDetails(data) {
 
   // ── Annotations (tags + comments + exclusions) keyed by Deal WS-ID ──────
   var annotationsCache = ANNOTATIONS.getAll();
-  var activeTagFilters = [];  // tags that must ALL match a row's annotations
+  var activeTagFilters = [];  // tags used to filter rows
+  var tagFilterMode    = "ALL"; // "ALL" = AND, "ANY" = OR
 
   // Returns only tag names that appear on WS-IDs present in the current data
   function currentTagNames() {
@@ -265,6 +266,21 @@ function renderDetails(data) {
         applyFiltersAndRender();
       });
     });
+
+    // Wire the ALL / ANY toggle
+    var toggle = document.getElementById("tag-mode-toggle");
+    if (toggle) {
+      toggle.querySelectorAll(".tag-mode-btn").forEach(function (btn) {
+        if (btn.dataset.mode === tagFilterMode) btn.classList.add("active");
+        else btn.classList.remove("active");
+        btn.addEventListener("click", function () {
+          tagFilterMode = btn.dataset.mode;
+          toggle.querySelectorAll(".tag-mode-btn").forEach(function (b) { b.classList.remove("active"); });
+          btn.classList.add("active");
+          applyFiltersAndRender();
+        });
+      });
+    }
   }
 
   // Restore sort state from saved session (filter DOM restored later, after DOM is built)
@@ -423,7 +439,12 @@ function renderDetails(data) {
   html += '<div class="filter-group"><label class="group-label">Incentive Expiry Date</label>'  + makeDateSlider("det-exp", dateBounds.exp) + '</div>';
   html += '<div class="filter-group"><label class="group-label">Earn Date' + tip("Moving this slider will automatically check the Earned filter.") + '</label>'              + makeDateSlider("det-ea",  dateBounds.ea)  + '</div>';
 
-  html += '<div class="filter-group"><label class="group-label"><i class="bi bi-tags me-1"></i>Tags</label><div id="annot-tag-filter-list"></div></div>';
+  html += '<div class="filter-group"><label class="group-label"><i class="bi bi-tags me-1"></i>Tags' +
+    '<span class="tag-mode-toggle ms-2" id="tag-mode-toggle" title="Switch between matching ALL or ANY selected tags">' +
+      '<button type="button" class="btn btn-xs tag-mode-btn active" data-mode="ALL">ALL</button>' +
+      '<button type="button" class="btn btn-xs tag-mode-btn" data-mode="ANY">ANY</button>' +
+    '</span>' +
+  '</label><div id="annot-tag-filter-list"></div></div>';
   html += '</div>'; // /det-filter-body
   html += '</div>'; // /sidebar
 
@@ -631,6 +652,7 @@ function renderDetails(data) {
     var _clrBtns = ["det-2tpartner-clear","det-crparty-clear"];
     _clrBtns.forEach(function(id) { var b = document.getElementById(id); if (b) b.classList.add("d-none"); });
     el.querySelectorAll('input[type=checkbox]').forEach(function (cb) { cb.checked = false; });
+    activeTagFilters = [];
     document.getElementById("filter-portfolio").value = "";
     document.getElementById("filter-offer").value = "";
     document.getElementById("filter-uc").value = "";
@@ -930,13 +952,21 @@ function renderDetails(data) {
       if (aapChecked          && String(r["AAP Flag"] || "") !== "Yes")                      return false;
       if (maxIncentiveChecked && norm(r["Maximum Incentive Deal Flag"]) !== "YES")          return false;
 
-      // Tag filter: row must have ALL selected tags
+      // Tag filter: AND = row must have ALL selected tags; ANY = row needs at least one
       if (activeTagFilters.length > 0) {
         var wsIdRow  = String(r["Deal WS-ID"] || "");
         var rowAnnot = annotationsCache[wsIdRow];
         var rowTags  = rowAnnot ? (rowAnnot.tags || []) : [];
-        for (var _ti = 0; _ti < activeTagFilters.length; _ti++) {
-          if (rowTags.indexOf(activeTagFilters[_ti]) === -1) return false;
+        if (tagFilterMode === "ANY") {
+          var hasAny = false;
+          for (var _ti = 0; _ti < activeTagFilters.length; _ti++) {
+            if (rowTags.indexOf(activeTagFilters[_ti]) !== -1) { hasAny = true; break; }
+          }
+          if (!hasAny) return false;
+        } else {
+          for (var _ti = 0; _ti < activeTagFilters.length; _ti++) {
+            if (rowTags.indexOf(activeTagFilters[_ti]) === -1) return false;
+          }
         }
       }
 
