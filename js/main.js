@@ -24,7 +24,7 @@ var APP_LOCALE = navigator.language || undefined;
 var PENDING_FILE_HANDLE = null;
 document.addEventListener("DOMContentLoaded", function () {
   var el = document.getElementById("app-version-label");
-  if (el) el.textContent = APP_VERSION + " · Interactive";
+  if (el) el.textContent = APP_VERSION;
 });
 
 // Workspan column names used to auto-detect the header row
