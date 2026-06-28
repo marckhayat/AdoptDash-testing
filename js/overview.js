@@ -121,9 +121,40 @@ function renderOverview(data) {
   // Add export button to the header bar
   var headerBar = el.querySelector(".border-bottom");
   if (headerBar) {
+    // Exclude-toggle button — count from full APP_DATA so button persists when filter is active
+    var _allWsIds = new Set((window.APP_DATA || data).map(function(r) { return String(r["Deal WS-ID"] || ""); }));
+    var exclCount = ANNOTATIONS.getExcludedWsIds().filter(function(id) { return _allWsIds.has(id); }).length;
+
+    if (exclCount > 0) {
+      var exclToggleBtn = document.createElement("button");
+      exclToggleBtn.id = "ovw-excl-toggle-btn";
+      exclToggleBtn.style.cssText = "font-size:0.82rem";
+      function _updateExclBtn() {
+        var active = !!window.APP_EXCL_ACTIVE;
+        if (active) {
+          exclToggleBtn.className = "btn btn-sm ms-auto btn-danger";
+          exclToggleBtn.innerHTML = '<i class="bi bi-slash-circle-fill me-1"></i>' + exclCount + ' UCs excluded — removed from calcs';
+          exclToggleBtn.title = "Excluded UCs are NOT counted. Click to include them.";
+        } else {
+          exclToggleBtn.className = "btn btn-sm ms-auto btn-outline-secondary";
+          exclToggleBtn.innerHTML = '<i class="bi bi-slash-circle me-1"></i>' + exclCount + ' UCs excluded — counted in calcs';
+          exclToggleBtn.title = "Excluded UCs are still counted. Click to remove them.";
+        }
+      }
+      _updateExclBtn();
+      exclToggleBtn.addEventListener("click", function () {
+        window.APP_EXCL_ACTIVE = !window.APP_EXCL_ACTIVE;
+        // Re-render overview with fresh data without destroying/rebuilding the whole tab
+        if (window.APP_DATA && window.renderOverview) {
+          window.renderOverview(window.getActiveData ? window.getActiveData() : window.APP_DATA);
+        }
+      });
+      headerBar.appendChild(exclToggleBtn);
+    }
+
     var exportBtn = document.createElement("button");
     exportBtn.id = "ovw-export-btn";
-    exportBtn.className = "btn btn-sm btn-outline-success ms-auto";
+    exportBtn.className = "btn btn-sm btn-outline-success" + (exclCount > 0 ? "" : " ms-auto");
     exportBtn.innerHTML = '<i class="bi bi-file-earmark-excel me-1"></i>Export to Excel';
     exportBtn.style.cssText = "font-size:0.82rem";
     exportBtn.addEventListener("click", exportOverviewToXlsx);

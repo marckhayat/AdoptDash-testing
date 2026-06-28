@@ -391,6 +391,34 @@
 /* ── Dimmed row (expired / completed) ───────────────────── */
 .row-dimmed td { background-color: #f0f0f0 !important; color: #999 !important; }
 
+/* ── Annotation tags & comment cell ─────────────────────── */
+.annot-tag {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 10px;
+  margin: 1px 2px 1px 0;
+  white-space: nowrap;
+  background: #e8f0fe;
+  color: #174ea6;
+  border: 1px solid #c5d5f8;
+}
+
+/* ALL / ANY toggle next to Tags filter label */
+.tag-mode-toggle           { display: inline-flex; border: 1px solid #c5d5f8; border-radius: 6px; overflow: hidden; vertical-align: middle; }
+.tag-mode-btn              { font-size: 0.65rem; font-weight: 700; padding: 1px 6px; border: none; background: transparent; color: #6c757d; cursor: pointer; line-height: 1.4; }
+.tag-mode-btn.active       { background: #174ea6; color: #fff; }
+.annot-cell               { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; min-width: 70px; }
+.annot-has-comment        { color: #0070d2; font-size: 0.78rem; cursor: default; }
+.annot-edit-btn           { color: #aaa !important; line-height: 1; }
+.annot-edit-btn:hover     { color: #0070d2 !important; }
+.annot-excl-btn           { line-height: 1; }
+
+/* Excluded rows in Details — dimmed but still visible */
+tr.row-excluded td        { opacity: 0.4; }
+tr.row-excluded:hover td  { opacity: 0.65; }
+
 /* -- CPI Adopt: smaller font for parenthesised text in card headers -- */
 #tab-cpi-adopt .card-header small { font-size: 0.78em; }
 

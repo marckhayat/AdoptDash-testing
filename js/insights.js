@@ -107,10 +107,11 @@ function renderTesting(data) {
 
   // View switcher
   html += '<ul class="nav nav-pills mb-4" id="testing-view-tabs">';
-  html += '<li class="nav-item"><button class="nav-link active" id="tab-btn-cpi"><i class="bi bi-graph-up-arrow me-1"></i>CPI Adopt</button></li>';
-  var _newTag = new Date() < new Date('2026-06-29') ? '<span class="position-absolute text-danger fw-bold" style="top:1px;right:2px;font-size:0.5rem;line-height:1">NEW</span>' : '';
-  html += '<li class="nav-item position-relative"><button class="nav-link" id="tab-btn-pareto"><i class="bi bi-bar-chart-steps me-1"></i>Customer Analysis</button>' + _newTag + '</li>';
-  html += '<li class="nav-item position-relative"><button class="nav-link" id="tab-btn-uch"><i class="bi bi-heart-pulse me-1"></i>UC Health</button>' + _newTag + '</li>';
+  var _newTagCpi = new Date() < new Date('2026-09-28') ? '<span class="position-absolute text-danger fw-bold" style="top:1px;right:2px;font-size:0.5rem;line-height:1">NEW</span>' : '';
+  var _newTagUch = new Date() < new Date('2026-09-28') ? '<span class="position-absolute text-danger fw-bold" style="top:1px;right:2px;font-size:0.5rem;line-height:1">NEW</span>' : '';
+  html += '<li class="nav-item position-relative"><button class="nav-link active" id="tab-btn-cpi"><i class="bi bi-graph-up-arrow me-1"></i>CPI Adopt</button>' + _newTagCpi + '</li>';
+  html += '<li class="nav-item"><button class="nav-link" id="tab-btn-pareto"><i class="bi bi-bar-chart-steps me-1"></i>Customer Analysis</button></li>';
+  html += '<li class="nav-item position-relative"><button class="nav-link" id="tab-btn-uch"><i class="bi bi-heart-pulse me-1"></i>UC Health</button>' + _newTagUch + '</li>';
   html += '<li class="nav-item"><button class="nav-link" id="tab-btn-lifecycle"><i class="bi bi-bar-chart me-1"></i>Lifecycle</button></li>';
   html += '</ul>';
 
@@ -197,14 +198,29 @@ function renderTesting(data) {
   html += '</div>';
 
   // Stage slider lives here (always rendered, always accessible)
-  html += '<div id="uch-cs-wrap" class="mb-4" style="display:none">';
+  html += '<div id="uch-cs-wrap" class="mb-4">';
   html += '<div class="d-flex flex-wrap gap-4 align-items-start">';
   html += '<div style="min-width:220px;max-width:300px"><div class="small text-muted mb-1">Current Stage</div>' + makeStageSliderHtml("uch-cs") + '</div>';
   html += '<div id="uch-kpi-area" class="d-flex flex-wrap gap-3 align-items-center"></div>';
   html += '</div>';
   html += '</div>';
 
-  html += '<div id="uch-stats"></div>';
+  html += '<div class="row g-3 mt-1" id="uch-main-row">';
+  html += '<div class="col-12 col-lg-3"><div class="card shadow-sm h-100"><div class="card-body">';
+  var _newTagStageChart = new Date() < new Date('2026-09-28') ? '<span class="text-danger fw-bold ms-1" style="font-size:0.5rem;line-height:1;vertical-align:super">NEW</span>' : '';
+  html += '<div class="d-flex align-items-center justify-content:between mb-3">';
+  html += '<h6 class="card-title mb-0" id="uch-donut-title">Stage Distribution</h6>';
+  html += _newTagStageChart;
+  html += '<div class="btn-group btn-group-sm ms-auto" role="group" aria-label="Chart type">';
+  html += '<button id="uch-chart-donut-btn" class="btn btn-outline-secondary active" title="Donut view"><i class="bi bi-pie-chart-fill"></i></button>';
+  html += '<button id="uch-chart-funnel-btn" class="btn btn-outline-secondary" title="Funnel view"><i class="bi bi-filter"></i></button>';
+  html += '</div></div>';
+  html += '<div id="uch-canvas-wrap"><canvas id="uch-donut-canvas"></canvas></div>';
+  html += '<div id="uch-funnel-container" style="display:none"></div>';
+  html += '</div></div></div>';
+  html += '<div class="col-12 col-lg-9"><div id="uch-stats"></div></div>';
+  html += '</div>';
+
   html += '</div>'; // close testing-view-uch
 
   // ── Lifecycle sub-view ────────────────────────────────────────────────────
@@ -214,6 +230,49 @@ function renderTesting(data) {
 
   html += '</div>'; // close outer div.p-3
   el.innerHTML = html;
+
+  // Always returns data respecting current APP_EXCL_ACTIVE state
+  function getEffectiveData() {
+    var base = (window.APP_DATA && window.APP_DATA.length) ? window.APP_DATA : data;
+    return (window.APP_EXCL_ACTIVE && window.getActiveData) ? window.getActiveData() : base;
+  }
+
+  // ── Exclude toggle button (shared across all subtabs) ─────────────────────
+  var insightNavTabs = document.getElementById("testing-view-tabs");
+  if (insightNavTabs) {
+    var _insightAllWsIds = new Set((window.APP_DATA || data).map(function(r) { return String(r["Deal WS-ID"] || ""); }));
+    var _insightExclCount = ANNOTATIONS.getExcludedWsIds().filter(function(id) { return _insightAllWsIds.has(id); }).length;
+    if (_insightExclCount > 0) {
+      var insightExclBtn = document.createElement("button");
+      insightExclBtn.id = "insight-excl-toggle-btn";
+      insightExclBtn.className = "btn btn-sm ms-auto";
+      insightExclBtn.style.cssText = "font-size:0.82rem;align-self:center";
+      function _updateInsightExclBtn() {
+        var active = !!window.APP_EXCL_ACTIVE;
+        if (active) {
+          insightExclBtn.className = "btn btn-sm ms-auto btn-danger";
+          insightExclBtn.innerHTML = '<i class="bi bi-slash-circle-fill me-1"></i>' + _insightExclCount + ' UCs excluded — removed from calcs';
+          insightExclBtn.title = "Excluded UCs are NOT counted. Click to include them.";
+        } else {
+          insightExclBtn.className = "btn btn-sm ms-auto btn-outline-secondary";
+          insightExclBtn.innerHTML = '<i class="bi bi-slash-circle me-1"></i>' + _insightExclCount + ' UCs excluded — counted in calcs';
+          insightExclBtn.title = "Excluded UCs are still counted. Click to remove them.";
+        }
+      }
+      _updateInsightExclBtn();
+      insightExclBtn.addEventListener("click", function () {
+        window.APP_EXCL_ACTIVE = !window.APP_EXCL_ACTIVE;
+        _updateInsightExclBtn();
+        if (_activeSubView === "pareto")         renderPareto();
+        else if (_activeSubView === "uch")       renderUCHealth();
+        else if (_activeSubView === "lifecycle") renderLifecycle(getEffectiveData());
+        else if (_activeSubView === "cpi")       renderCPIAdopt(getEffectiveData());
+      });
+      // Wrap nav in a flex row so button aligns right
+      insightNavTabs.style.cssText = "display:flex;flex-wrap:wrap;align-items:center";
+      insightNavTabs.appendChild(insightExclBtn);
+    }
+  }
 
   // ── Render function ────────────────────────────────────────────────────────
   function renderPareto() {
@@ -228,7 +287,7 @@ function renderTesting(data) {
     var csActive        = !(csFromIdx === 0 && csToIdx === stageMaxIdx);
 
     // Filter based on selected mode
-    var filtered = data.filter(function(r) {
+    var filtered = getEffectiveData().filter(function(r) {
       if (norm(r["Stage"]) !== "ELIGIBLE") return false;
       if (mode === "eligible") {
         if (norm(r["Maximum Incentive Deal Flag"]) !== "YES") return false;
@@ -264,15 +323,23 @@ function renderTesting(data) {
       dealCounts[dim] = (dealCounts[dim] || 0) + 1;
       if (!dimNames[dim])    dimNames[dim]    = {};
       if (!dealValueMap[dim]) dealValueMap[dim] = {};
-      dimNames[dim][name] = (dimNames[dim][name] || 0) + 1;
+      if (!dimNames[dim][name]) dimNames[dim][name] = { count: 0, value: 0 };
+      dimNames[dim][name].count += 1;
+      dimNames[dim][name].value += val;
       dealValueMap[dim][key] = { value: (dealValueMap[dim][key] ? dealValueMap[dim][key].value : 0) + val, optedIn: optedIn };
     });
 
-    // Build primary label (most frequent name) and full name list per dim
+    // Build primary label and full name list per dim.
+    // Priority: 1) highest total potential incentives, 2) highest deal count, 3) alphabetical.
     function primaryLabel(dim) {
       if (isDisti) return dim;
-      var counts = dimNames[dim] || {};
-      return Object.keys(counts).sort(function(a,b){ return counts[b]-counts[a]; })[0] || dim;
+      var names = dimNames[dim] || {};
+      return Object.keys(names).sort(function(a, b) {
+        var na = names[a], nb = names[b];
+        if (nb.value !== na.value) return nb.value - na.value;
+        if (nb.count !== na.count) return nb.count - na.count;
+        return a.localeCompare(b);
+      })[0] || dim;
     }
     function allNames(dim) {
       if (isDisti) return [dim];
@@ -530,7 +597,7 @@ function renderTesting(data) {
                 var entry = top[ctx.dataIndex];
                 var deals = entry ? entry.deals : 0;
                 var names = entry ? entry.names : [];
-                var lines = [" Total: " + fmtCurrency(entry ? entry.value : 0), " WS deals: " + deals];
+                var lines = [" Total: " + fmtCurrency(entry ? entry.value : 0), " WS deals: " + deals + (entry ? " (CX BU " + entry.id + ")" : "")];
                 if (names.length > 1) {
                   lines.push(" ─ Names:");
                   names.forEach(function(n){ lines.push("   · " + n); });
@@ -760,8 +827,7 @@ function renderTesting(data) {
           });
           uchUpdateBreadcrumb();
           uchSlideToStep(0);
-          var se = document.getElementById("uch-stats"); if (se) se.innerHTML = "";
-          var cw = document.getElementById("uch-cs-wrap"); if (cw) cw.style.display = "none";
+          renderUCHealth();
         } else if (step === "0") {
           // Back to offer panel for this portfolio
           _uchState.offer = ""; _uchState.uc = "";
@@ -805,10 +871,289 @@ function renderTesting(data) {
     }
     uchUpdateBreadcrumb();
     uchSlideToStep(arrivedAtStep);
-    if (!_uchState.uc) {
-      var se = document.getElementById("uch-stats"); if (se) se.innerHTML = "";
-      var cw = document.getElementById("uch-cs-wrap"); if (cw) cw.style.display = "none";
+    uchSaveState();
+    // Show main row as soon as any selection is made
+    var mr = document.getElementById("uch-main-row");
+    if (mr) mr.style.display = "";
+    renderUCHealth();
+  }
+
+  // ── UC Health: donut chart ───────────────────────────────────────────────
+  var _uchDonutChart = null;
+  var _uchChartView  = "donut";   // "donut" | "funnel"
+  var UCH_STAGE_COLORS = {
+    "Purchase":  "#e74c3c",
+    "Onboard":   "#e07070",
+    "Implement": "#e67e22",
+    "Use":       "#f0b429",
+    "Engage":    "#27ae60",
+    "Adopt":     "#2ecc71",
+    "Completed": "#1abc9c"
+  };
+
+  // Colors for funnel "X completed" bars — reflects progress achieved
+  var UCH_FUNNEL_COLORS = {
+    "Purchase":  "#e74c3c",  // red  — only Purchase done
+    "Onboard":   "#f0b429",  // yellow — mid progress
+    "Implement": "#f0b429",  // yellow
+    "Use":       "#27ae60",  // green — good progress
+    "Engage":    "#27ae60",  // green
+    "Adopt":     "#27ae60"   // green
+  };
+
+  function renderUCHDonut() {
+    var canvas     = document.getElementById("uch-donut-canvas");
+    var canvasWrap = document.getElementById("uch-canvas-wrap");
+    var funnelDiv  = document.getElementById("uch-funnel-container");
+    if (!canvas) return;
+    if (canvasWrap) canvasWrap.style.display = "";
+    if (funnelDiv)  funnelDiv.style.display  = "none";
+
+    var uchCsFromEl = document.getElementById("uch-cs-from");
+    var uchCsToEl   = document.getElementById("uch-cs-to");
+    var csFromIdx   = uchCsFromEl ? parseInt(uchCsFromEl.value) : 0;
+    var csToIdx     = uchCsToEl   ? parseInt(uchCsToEl.value)   : stageMaxIdx;
+    var csActive    = !(csFromIdx === 0 && csToIdx === stageMaxIdx);
+
+    var seenKeys = {};
+    var filtered = getEffectiveData().filter(function(r) {
+      if (norm(r["Stage"]) !== "ELIGIBLE") return false;
+      if (norm(r["Adopt Rebate Opt-In Status"]) !== "OPTED IN") return false;
+      if (_uchState.portfolio && r["Deal CPI Portfolio"] !== _uchState.portfolio) return false;
+      if (_uchState.offer     && r["Track"]              !== _uchState.offer)     return false;
+      if (_uchState.uc        && r["Sub-Track"]          !== _uchState.uc)        return false;
+      if (csActive) {
+        var si = STAGE_ORDER.indexOf(String(r["Current stage"] || ""));
+        if (si === -1 || si < csFromIdx || si > csToIdx) return false;
+      }
+      var key = String(r["CRPartyID-Offer"] || r["Deal WS-ID"] || "");
+      if (key) { if (seenKeys[key]) return false; seenKeys[key] = true; }
+      return true;
+    });
+
+    var stageCounts = {};
+    STAGE_ORDER.forEach(function(s) { stageCounts[s] = 0; });
+    filtered.forEach(function(r) {
+      var cs = r["Current stage"] || "Unknown";
+      if (stageCounts[cs] !== undefined) stageCounts[cs]++;
+      else stageCounts[cs] = (stageCounts[cs] || 0) + 1;
+    });
+
+    var labels = STAGE_ORDER.filter(function(s) { return stageCounts[s] > 0; });
+    var values = labels.map(function(s) { return stageCounts[s]; });
+    var colors = labels.map(function(s) { return UCH_STAGE_COLORS[s] || "#adb5bd"; });
+    var total  = filtered.length;
+
+    var titleEl = document.getElementById("uch-donut-title");
+    if (titleEl) titleEl.textContent = "Stage Distribution (" + total + " deal" + (total !== 1 ? "s" : "") + ")";
+
+    // ── KPI strip ────────────────────────────────────────────────────────────
+    var kpiArea = document.getElementById("uch-kpi-area");
+    if (kpiArea) {
+      if (total === 0) {
+        kpiArea.innerHTML = '<span class="text-muted small">No opted-in eligible deals in this selection.</span>';
+      } else {
+        var daysVals   = filtered.map(function(r){ return r["Days in stage"]; }).filter(function(v){ return v !== null && v !== undefined && !isNaN(v); });
+        var avgDaysAll = daysVals.length ? Math.round(daysVals.reduce(function(s,v){return s+v;},0) / daysVals.length) : null;
+        var kh = '';
+        kh += '<div class="card shadow-sm"><div class="card-body p-3">';
+        kh += '<div class="text-muted small mb-1">Opted-in Deals</div><div class="fs-4 fw-bold text-success">' + total + '</div>';
+        kh += '</div></div>';
+        if (avgDaysAll !== null) {
+          kh += '<div class="card shadow-sm"><div class="card-body p-3">';
+          kh += '<div class="text-muted small mb-1">Avg Days in Stage</div><div class="fs-4 fw-bold">' + avgDaysAll + '</div>';
+          kh += '</div></div>';
+        }
+        var uchPreset = { stage: ["Eligible"], optIn: ["OPTED IN"], sortField: "Potential Incentives", sortDir: "desc" };
+        if (_uchState.portfolio) uchPreset.portfolio = _uchState.portfolio;
+        if (_uchState.offer)     uchPreset.offer     = _uchState.offer;
+        if (_uchState.uc)        uchPreset.uc        = _uchState.uc;
+        if (csActive)            { uchPreset.csFrom  = csFromIdx; uchPreset.csTo = csToIdx; }
+        kh += '<a href="#" id="uch-deeplink" class="small"><i class="bi bi-box-arrow-up-right me-1"></i>Open in Details tab</a>';
+        kpiArea.innerHTML = kh;
+        var dlLink = document.getElementById("uch-deeplink");
+        if (dlLink) dlLink.addEventListener("click", function(e) { e.preventDefault(); window.navigateToDetails(uchPreset); });
+      }
     }
+
+    if (_uchDonutChart) { _uchDonutChart.destroy(); _uchDonutChart = null; }
+    if (total === 0) return;
+
+    _uchDonutChart = new Chart(canvas, {
+      type: "doughnut",
+      data: {
+        labels: labels,
+        datasets: [{ data: values, backgroundColor: colors, borderWidth: 2, borderColor: "#fff", hoverOffset: 6 }]
+      },
+      options: {
+        cutout: "62%",
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+          legend: { position: "bottom", labels: { boxWidth: 12, padding: 8, font: { size: 11 } } },
+          tooltip: {
+            callbacks: {
+              label: function(ctx) {
+                var pct = total > 0 ? Math.round(ctx.parsed / total * 100) : 0;
+                return ctx.label + ": " + ctx.parsed + " (" + pct + "%)";
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  function renderUCHFunnel() {
+    var canvasWrap = document.getElementById("uch-canvas-wrap");
+    var container  = document.getElementById("uch-funnel-container");
+    if (!container) return;
+    if (canvasWrap) canvasWrap.style.display = "none";
+    container.style.display = "";
+    if (_uchDonutChart) { _uchDonutChart.destroy(); _uchDonutChart = null; }
+
+    var uchCsFromEl = document.getElementById("uch-cs-from");
+    var uchCsToEl   = document.getElementById("uch-cs-to");
+    var csFromIdx   = uchCsFromEl ? parseInt(uchCsFromEl.value) : 0;
+    var csToIdx     = uchCsToEl   ? parseInt(uchCsToEl.value)   : stageMaxIdx;
+    var csActive    = !(csFromIdx === 0 && csToIdx === stageMaxIdx);
+
+    var seenKeys = {};
+    var filtered = getEffectiveData().filter(function(r) {
+      if (norm(r["Stage"]) !== "ELIGIBLE") return false;
+      if (norm(r["Adopt Rebate Opt-In Status"]) !== "OPTED IN") return false;
+      if (_uchState.portfolio && r["Deal CPI Portfolio"] !== _uchState.portfolio) return false;
+      if (_uchState.offer     && r["Track"]              !== _uchState.offer)     return false;
+      if (_uchState.uc        && r["Sub-Track"]          !== _uchState.uc)        return false;
+      if (csActive) {
+        var si = STAGE_ORDER.indexOf(String(r["Current stage"] || ""));
+        if (si === -1 || si < csFromIdx || si > csToIdx) return false;
+      }
+      var key = String(r["CRPartyID-Offer"] || r["Deal WS-ID"] || "");
+      if (key) { if (seenKeys[key]) return false; seenKeys[key] = true; }
+      return true;
+    });
+
+    var stageCounts = {};
+    STAGE_ORDER.forEach(function(s) { stageCounts[s] = 0; });
+    filtered.forEach(function(r) {
+      var cs = r["Current stage"] || "Unknown";
+      if (stageCounts[cs] !== undefined) stageCounts[cs]++;
+      else stageCounts[cs] = (stageCounts[cs] || 0) + 1;
+    });
+
+    // Build cumulative funnel rows:
+    // Row 0 = all total; rows 1..N = "X completed" (current stage index > i)
+    // Exclude "Completed" from labels since it is already the terminal state
+    var total    = filtered.length;
+    var funnelRows = [];
+    funnelRows.push({ label: "All Eligible Opted-in", count: total, color: "#0d6efd" });
+    for (var fi = 0; fi < STAGE_ORDER.length - 1; fi++) {
+      var completedStage = STAGE_ORDER[fi];
+      var cumCount = 0;
+      for (var fj = fi + 1; fj < STAGE_ORDER.length; fj++) {
+        cumCount += (stageCounts[STAGE_ORDER[fj]] || 0);
+      }
+      if (cumCount > 0) {
+        funnelRows.push({
+          label: completedStage + " \u2713",
+          count: cumCount,
+          color: UCH_FUNNEL_COLORS[completedStage] || "#adb5bd"
+        });
+      }
+    }
+
+    var titleEl = document.getElementById("uch-donut-title");
+    if (titleEl) titleEl.textContent = "Stage Distribution (" + total + " deal" + (total !== 1 ? "s" : "") + ")";
+
+    // ── KPI strip (same as donut) ─────────────────────────────────────────────
+    var kpiArea = document.getElementById("uch-kpi-area");
+    if (kpiArea) {
+      if (total === 0) {
+        kpiArea.innerHTML = '<span class="text-muted small">No opted-in eligible deals in this selection.</span>';
+      } else {
+        var daysVals   = filtered.map(function(r){ return r["Days in stage"]; }).filter(function(v){ return v !== null && v !== undefined && !isNaN(v); });
+        var avgDaysAll = daysVals.length ? Math.round(daysVals.reduce(function(s,v){return s+v;},0) / daysVals.length) : null;
+        var kh = '';
+        kh += '<div class="card shadow-sm"><div class="card-body p-3">';
+        kh += '<div class="text-muted small mb-1">Opted-in Deals</div><div class="fs-4 fw-bold text-success">' + total + '</div>';
+        kh += '</div></div>';
+        if (avgDaysAll !== null) {
+          kh += '<div class="card shadow-sm"><div class="card-body p-3">';
+          kh += '<div class="text-muted small mb-1">Avg Days in Stage</div><div class="fs-4 fw-bold">' + avgDaysAll + '</div>';
+          kh += '</div></div>';
+        }
+        var uchPreset = { stage: ["Eligible"], optIn: ["OPTED IN"], sortField: "Potential Incentives", sortDir: "desc" };
+        if (_uchState.portfolio) uchPreset.portfolio = _uchState.portfolio;
+        if (_uchState.offer)     uchPreset.offer     = _uchState.offer;
+        if (_uchState.uc)        uchPreset.uc        = _uchState.uc;
+        if (csActive)            { uchPreset.csFrom  = csFromIdx; uchPreset.csTo = csToIdx; }
+        kh += '<a href="#" id="uch-deeplink" class="small"><i class="bi bi-box-arrow-up-right me-1"></i>Open in Details tab</a>';
+        kpiArea.innerHTML = kh;
+        var dlLink = document.getElementById("uch-deeplink");
+        if (dlLink) dlLink.addEventListener("click", function(e) { e.preventDefault(); window.navigateToDetails(uchPreset); });
+      }
+    }
+
+    if (total === 0) {
+      container.innerHTML = '<p class="text-muted small text-center mt-3">No opted-in eligible deals.</p>';
+      return;
+    }
+
+    var funnelWidthPx = Math.max(240, container.clientWidth || 260);
+    var measureCanvas = document.createElement("canvas");
+    var measureCtx = measureCanvas.getContext("2d");
+    var canMeasureText = !!measureCtx;
+    if (measureCtx) {
+      measureCtx.font = "600 10px sans-serif";
+    }
+    var fh = '<div style="padding:8px 0;width:100%;">';
+    funnelRows.forEach(function(row) {
+      var pct    = total > 0 ? Math.round(row.count / total * 100) : 0;
+      var widPct = total > 0 ? Math.max(2, Math.round(row.count / total * 100)) : 100;
+      var tooltip = row.label === "All Eligible Opted-in" ? row.label : row.label.replace(" \u2713", " completed");
+      var countText = row.count + " (" + pct + "%)";
+      var barInnerWidth = (funnelWidthPx * widPct / 100) - 16;
+      var narrow;
+      if (canMeasureText) {
+        var labelWidth = measureCtx.measureText(row.label).width;
+        measureCtx.font = "10px sans-serif";
+        var countWidth = measureCtx.measureText(countText).width;
+        measureCtx.font = "600 10px sans-serif";
+        narrow = (labelWidth + countWidth + 14) > barInnerWidth;
+      } else {
+        narrow = (widPct / 100 * funnelWidthPx) < (row.label.length * 6.5 + 55);
+      }
+      // Row wrapper — bar is absolutely centered, label pinned to its right edge
+      fh += '<div style="position:relative;width:100%;height:26px;margin-bottom:3px;" title="' + escHtml(tooltip) + ': ' + row.count + ' deals (' + pct + '%)">';
+      // Centered colored bar
+      fh += '<div style="position:absolute;left:50%;transform:translateX(-50%);width:' + widPct + '%;height:100%;';
+      fh += 'background:' + row.color + ';border-radius:3px;box-sizing:border-box;overflow:hidden;';
+      if (!narrow) {
+        fh += 'display:flex;align-items:center;justify-content:space-between;padding:4px 8px;';
+      }
+      fh += '">';
+      if (!narrow) {
+        fh += '<span style="color:#fff;font-size:10px;font-weight:600;white-space:nowrap;flex-shrink:1;min-width:0;">' + escHtml(row.label) + '</span>';
+        fh += '<span style="color:rgba(255,255,255,0.9);font-size:10px;white-space:nowrap;flex-shrink:0;margin-left:4px;">' + row.count + '<span style="opacity:0.75"> (' + pct + '%)</span></span>';
+      }
+      fh += '</div>';
+      // Outside label anchored to the right edge of the bar
+      if (narrow) {
+        fh += '<span style="position:absolute;left:calc(50% + ' + (widPct / 2) + '% + 6px);top:50%;transform:translateY(-50%);';
+        fh += 'font-size:10px;white-space:nowrap;color:#495057;">';
+        fh += escHtml(row.label) + ' <strong>' + row.count + '</strong><span style="color:#6c757d"> (' + pct + '%)</span>';
+        fh += '</span>';
+      }
+      fh += '</div>';
+    });
+    fh += '</div>';
+    container.innerHTML = fh;
+  }
+
+  function renderUCHChart() {
+    if (_uchChartView === "funnel") renderUCHFunnel();
+    else                            renderUCHDonut();
   }
 
   function renderUCHealth() {
@@ -826,11 +1171,61 @@ function renderTesting(data) {
 
     uchSaveState();
     var uchCsWrap = document.getElementById("uch-cs-wrap");
-    if (!uc) { statsEl.innerHTML = ""; if (uchCsWrap) uchCsWrap.style.display = "none"; return; }
     if (uchCsWrap) uchCsWrap.style.display = "";
 
+    if (!uc) {
+      // No UC selected — show aggregated stage breakdown for the current portfolio/offer selection
+      var seenKeys = {};
+      var aggDeals = getEffectiveData().filter(function(r) {
+        if (norm(r["Stage"]) !== "ELIGIBLE") return false;
+        if (norm(r["Adopt Rebate Opt-In Status"]) !== "OPTED IN") return false;
+        if (portfolio && r["Deal CPI Portfolio"] !== portfolio) return false;
+        if (offer && r["Track"] !== offer) return false;
+        if (csActive) {
+          var si = STAGE_ORDER.indexOf(String(r["Current stage"] || ""));
+          if (si === -1 || si < csFromIdx || si > csToIdx) return false;
+        }
+        var key = String(r["CRPartyID-Offer"] || r["Deal WS-ID"] || "");
+        if (key) { if (seenKeys[key]) return false; seenKeys[key] = true; }
+        return true;
+      });
+      var aggStageGroups = {};
+      aggDeals.forEach(function(r) {
+        var cs = r["Current stage"] || "Unknown";
+        if (!aggStageGroups[cs]) aggStageGroups[cs] = [];
+        aggStageGroups[cs].push(r);
+      });
+      var aggStages = STAGE_ORDER.filter(function(s) { return aggStageGroups[s] && aggStageGroups[s].length > 0; });
+      var ah = '<div class="row g-3">';
+      ah += '<div class="col-12 col-lg-4"><div class="card shadow-sm h-100"><div class="card-body">';
+      ah += '<h6 class="card-title mb-3">Stage Breakdown</h6>';
+      if (aggStages.length > 0) {
+        ah += '<table class="table table-sm table-hover mb-0" style="table-layout:fixed"><colgroup><col style="width:50%"><col style="width:20%"><col style="width:30%"></colgroup>';
+        ah += '<thead><tr><th>Stage</th><th class="text-end">Deals</th><th class="text-end">Avg Days</th></tr></thead><tbody>';
+        aggStages.forEach(function(stage) {
+          var rows = aggStageGroups[stage];
+          var sd = rows.map(function(r) { return r["Days in stage"]; }).filter(function(v) { return v !== null && v !== undefined && !isNaN(v); });
+          var sa = sd.length ? Math.round(sd.reduce(function(s, v) { return s + v; }, 0) / sd.length) : null;
+          ah += '<tr><td>' + stageBadgeHtml(stage) + '</td><td class="text-end">' + rows.length + '</td>';
+          ah += '<td class="text-end">' + (sa !== null ? sa + 'd' : '—') + '</td></tr>';
+        });
+        ah += '</tbody></table>';
+      } else {
+        ah += '<p class="text-muted small">No opted-in eligible deals in this selection.</p>';
+      }
+      ah += '</div></div></div>';
+      ah += '<div class="col-12 col-lg-8"><div class="card shadow-sm h-100"><div class="card-body">';
+      ah += '<h6 class="card-title mb-3">Top Pending Tasks</h6>';
+      ah += '<p class="text-muted small">Select a Use Case to see pending task details.</p>';
+      ah += '</div></div></div>';
+      ah += '</div>';
+      statsEl.innerHTML = ah;
+      renderUCHChart();
+      return;
+    }
+
     var seenKeys = {};
-    var deals = data.filter(function(r) {
+    var deals = getEffectiveData().filter(function(r) {
       if (norm(r["Stage"]) !== "ELIGIBLE") return false;
       if (norm(r["Adopt Rebate Opt-In Status"]) !== "OPTED IN") return false;
       if (portfolio && r["Deal CPI Portfolio"] !== portfolio) return false;
@@ -846,15 +1241,11 @@ function renderTesting(data) {
     });
 
     if (deals.length === 0) {
-      var kpiArea0 = document.getElementById("uch-kpi-area");
-      if (kpiArea0) kpiArea0.innerHTML = '<span class="text-muted small">No deals in this stage range.</span>';
       statsEl.innerHTML = '';
       return;
     }
 
     var totalDeals = deals.length;
-    var daysVals   = deals.map(function(r){ return r["Days in stage"]; }).filter(function(v){ return v !== null && v !== undefined && !isNaN(v); });
-    var avgDaysAll = daysVals.length ? Math.round(daysVals.reduce(function(s,v){return s+v;},0) / daysVals.length) : null;
 
     var stageGroups = {};
     deals.forEach(function(r) {
@@ -879,34 +1270,11 @@ function renderTesting(data) {
     var topTasks = Object.keys(taskData).map(function(t){ return { name: t, count: taskData[t].count, stages: Object.keys(taskData[t].stages) }; });
     topTasks.sort(function(a,b){ return b.count - a.count; });
 
-    var uchPreset = { stage: ["Eligible"], optIn: ["OPTED IN"], sortField: "Potential Incentives", sortDir: "desc" };
-    if (portfolio) uchPreset.portfolio = portfolio;
-    if (offer)     uchPreset.offer     = offer;
-    if (uc)        uchPreset.uc        = uc;
-    if (csActive)  { uchPreset.csFrom  = csFromIdx; uchPreset.csTo = csToIdx; }
-
-    // KPI area + deeplink (rendered into persistent slot next to slider)
-    var kpiArea = document.getElementById("uch-kpi-area");
-    if (kpiArea) {
-      var kh = '';
-      kh += '<div class="card shadow-sm"><div class="card-body p-3">';
-      kh += '<div class="text-muted small mb-1">Opted-in Deals</div><div class="fs-4 fw-bold text-success">' + totalDeals + '</div>';
-      kh += '</div></div>';
-      if (avgDaysAll !== null) {
-        kh += '<div class="card shadow-sm"><div class="card-body p-3">';
-        kh += '<div class="text-muted small mb-1">Avg Days in Stage</div><div class="fs-4 fw-bold">' + avgDaysAll + '</div>';
-        kh += '</div></div>';
-      }
-      kh += '<a href="#" id="uch-deeplink" class="small"><i class="bi bi-box-arrow-up-right me-1"></i>Open in Details tab</a>';
-      kpiArea.innerHTML = kh;
-      var dlLink = document.getElementById("uch-deeplink");
-      if (dlLink) dlLink.addEventListener("click", function(e) { e.preventDefault(); window.navigateToDetails(uchPreset); });
-    }
-
     var stagesPresent = STAGE_ORDER.filter(function(s){ return stageGroups[s] && stageGroups[s].length > 0; });
     var h = '';
     h += '<div class="row g-3">';
-    h += '<div class="col-12 col-lg-3"><div class="card shadow-sm h-100"><div class="card-body">';
+
+    h += '<div class="col-12 col-lg-4"><div class="card shadow-sm h-100"><div class="card-body">';
     h += '<h6 class="card-title mb-3">Stage Breakdown</h6>';
     if (stagesPresent.length > 0) {
       h += '<table class="table table-sm table-hover mb-0" style="table-layout:fixed"><colgroup><col style="width:50%"><col style="width:20%"><col style="width:30%"></colgroup><thead><tr><th>Stage</th><th class="text-end">Deals</th><th class="text-end">Avg Days</th></tr></thead><tbody>';
@@ -921,7 +1289,7 @@ function renderTesting(data) {
     } else { h += '<p class="text-muted small">No stage data available.</p>'; }
     h += '</div></div></div>';
 
-    h += '<div class="col-12 col-lg-9"><div class="card shadow-sm h-100"><div class="card-body">';
+    h += '<div class="col-12 col-lg-8"><div class="card shadow-sm h-100"><div class="card-body">';
     h += '<h6 class="card-title mb-3">Top Pending Tasks</h6>';
     if (topTasks.length > 0) {
       h += '<div class="d-flex flex-column gap-2">';
@@ -946,10 +1314,13 @@ function renderTesting(data) {
     h += '</div>';
 
     statsEl.innerHTML = h;
+    renderUCHChart();
   }
 
-  // View switcher
+  // View switcher — tracks which subtab is currently active
+  var _activeSubView = "cpi";
   function showSubView(view) {
+    _activeSubView = view;
     document.getElementById("testing-view-cpi").style.display        = view === "cpi"       ? "" : "none";
     document.getElementById("testing-view-pareto").style.display     = view === "pareto"    ? "" : "none";
     document.getElementById("testing-view-uch").style.display        = view === "uch"       ? "" : "none";
@@ -998,10 +1369,28 @@ function renderTesting(data) {
     uchRenderStep(1);
   });
   uchUpdateBreadcrumb();
+  renderUCHealth();
   if (_uchState.portfolio) {
     var _restoreStep = _uchState.uc ? 2 : (_uchState.offer ? 2 : 1);
     uchRenderStep(_restoreStep);
-    if (_uchState.uc) renderUCHealth();
+  }
+
+  // ── Chart-type toggle buttons ─────────────────────────────────────────────
+  var _donutBtn  = document.getElementById("uch-chart-donut-btn");
+  var _funnelBtn = document.getElementById("uch-chart-funnel-btn");
+  if (_donutBtn && _funnelBtn) {
+    _donutBtn.addEventListener("click", function() {
+      _uchChartView = "donut";
+      _donutBtn.classList.add("active");
+      _funnelBtn.classList.remove("active");
+      renderUCHChart();
+    });
+    _funnelBtn.addEventListener("click", function() {
+      _uchChartView = "funnel";
+      _funnelBtn.classList.add("active");
+      _donutBtn.classList.remove("active");
+      renderUCHChart();
+    });
   }
 
   // Pareto slicer events
@@ -1019,16 +1408,21 @@ function renderTesting(data) {
 
   document.getElementById("tab-btn-cpi").addEventListener("click", function() {
     showSubView("cpi");
-    renderCPIAdopt(data);
+    renderCPIAdopt(getEffectiveData());
   });
   document.getElementById("tab-btn-pareto").addEventListener("click", function() {
+    var nav = document.getElementById("cpi-scroll-nav"); if (nav) nav.remove();
     showSubView("pareto");
     renderPareto();
   });
-  document.getElementById("tab-btn-uch").addEventListener("click", function() { showSubView("uch"); });
+  document.getElementById("tab-btn-uch").addEventListener("click", function() {
+    var nav = document.getElementById("cpi-scroll-nav"); if (nav) nav.remove();
+    showSubView("uch");
+  });
   document.getElementById("tab-btn-lifecycle").addEventListener("click", function() {
+    var nav = document.getElementById("cpi-scroll-nav"); if (nav) nav.remove();
     showSubView("lifecycle");
-    renderLifecycle(data);
+    renderLifecycle(getEffectiveData());
   });
 
   // Restore active sub-view (or default to CPI Adopt)
@@ -1043,10 +1437,10 @@ function renderTesting(data) {
     showSubView("uch");
   } else if (savedView === "lifecycle") {
     showSubView("lifecycle");
-    renderLifecycle(data);
+    renderLifecycle(getEffectiveData());
   } else {
     showSubView("cpi");
-    renderCPIAdopt(data);
+    renderCPIAdopt(getEffectiveData());
   }
 }
 

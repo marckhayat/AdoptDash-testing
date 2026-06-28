@@ -12,9 +12,10 @@
 
 var IDB = (function () {
   var DB_NAME      = "AdoptionDashboard";
-  var DB_VERSION   = 3;
+  var DB_VERSION   = 4;
   var STORE        = "datasets";
   var HANDLE_STORE = "fileHandles";
+  var ANNOT_STORE  = "annotations";
   var _db          = null;
 
   // ── localStorage-backed session metadata ────────────────────────────────
@@ -52,6 +53,9 @@ var IDB = (function () {
         }
         if (!db.objectStoreNames.contains(HANDLE_STORE)) {
           db.createObjectStore(HANDLE_STORE, { keyPath: "type" });
+        }
+        if (!db.objectStoreNames.contains(ANNOT_STORE)) {
+          db.createObjectStore(ANNOT_STORE, { keyPath: "wsId" });
         }
       };
       req.onsuccess  = function (e) { _db = e.target.result; resolve(_db); };
@@ -201,5 +205,65 @@ var IDB = (function () {
     });
   }
 
-  return { save: save, load: load, remove: remove, loadAll: loadAll, loadAllMeta: loadAllMeta, clearAll: clearAll, requestPersistence: requestPersistence, saveHandle: saveHandle, loadHandle: loadHandle, removeHandle: removeHandle, clearAllHandles: clearAllHandles };
+  function saveAnnotation(wsId, tags, comment, excluded) {
+    return open().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx    = db.transaction(ANNOT_STORE, "readwrite");
+        var store = tx.objectStore(ANNOT_STORE);
+        var req   = store.put({ wsId: wsId, tags: tags || [], comment: comment || "", excluded: !!excluded });
+        req.onsuccess = resolve;
+        req.onerror   = function (e) { reject(e.target.error); };
+      });
+    });
+  }
+
+  function loadAnnotation(wsId) {
+    return open().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx    = db.transaction(ANNOT_STORE, "readonly");
+        var store = tx.objectStore(ANNOT_STORE);
+        var req   = store.get(wsId);
+        req.onsuccess = function (e) { resolve(e.target.result || null); };
+        req.onerror   = function (e) { reject(e.target.error); };
+      });
+    });
+  }
+
+  function removeAnnotation(wsId) {
+    return open().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx    = db.transaction(ANNOT_STORE, "readwrite");
+        var store = tx.objectStore(ANNOT_STORE);
+        var req   = store.delete(wsId);
+        req.onsuccess = resolve;
+        req.onerror   = function (e) { reject(e.target.error); };
+      });
+    });
+  }
+
+  function loadAllAnnotations() {
+    return open().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx    = db.transaction(ANNOT_STORE, "readonly");
+        var store = tx.objectStore(ANNOT_STORE);
+        var req   = store.getAll();
+        req.onsuccess = function (e) { resolve(e.target.result || []); };
+        req.onerror   = function (e) { reject(e.target.error); };
+      });
+    });
+  }
+
+  function clearAllAnnotations() {
+    return open().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx    = db.transaction(ANNOT_STORE, "readwrite");
+        var store = tx.objectStore(ANNOT_STORE);
+        var req   = store.clear();
+        req.onsuccess = resolve;
+        req.onerror   = function (e) { reject(e.target.error); };
+      });
+    });
+  }
+
+  return { save: save, load: load, remove: remove, loadAll: loadAll, loadAllMeta: loadAllMeta, clearAll: clearAll, requestPersistence: requestPersistence, saveHandle: saveHandle, loadHandle: loadHandle, removeHandle: removeHandle, clearAllHandles: clearAllHandles, saveAnnotation: saveAnnotation, loadAnnotation: loadAnnotation, removeAnnotation: removeAnnotation, loadAllAnnotations: loadAllAnnotations, clearAllAnnotations: clearAllAnnotations };
 })();

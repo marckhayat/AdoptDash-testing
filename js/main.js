@@ -16,7 +16,8 @@ var APP_FILE_META = null;
 var APP_FILTER_STATE = { details: null, lifecycle: null, cpiAdopt: null, customer: null, testing: null };
 var APP_IS_DISTI = false;
 var APP_MULTI_SESSIONS = null; // { sessions: [...], fileMeta: {...} }
-var APP_VERSION = "v6.8.6";
+var APP_EXCL_ACTIVE = false;   // when true, excluded deals are removed from overview/pvi/insights calculations
+var APP_VERSION = "v6.8.7";
 // Use the browser's preferred language for date formatting (respects user's browser locale setting)
 var APP_LOCALE = navigator.language || undefined;
 // Holds a FileSystemFileHandle from showOpenFilePicker() to be persisted after load
@@ -46,6 +47,10 @@ function init() {
   document.querySelectorAll('[data-bs-toggle="tab"]').forEach(function (tab) {
     tab.addEventListener("shown.bs.tab", function (e) {
       if (!APP_DATA) return;
+      if (e.target.dataset.bsTarget !== "#tab-testing") {
+        var nav = document.getElementById("cpi-scroll-nav");
+        if (nav) nav.remove();
+      }
       renderActiveTab(e.target.dataset.bsTarget);
     });
   });
@@ -239,7 +244,11 @@ function handleCSV(file) {
         setTimeout(function() {
           try {
             APP_DATA = transformData(results.data);
-            finishLoad(file.name, APP_DATA.length, false, "ws-" + file.name);
+            var _wsGeoIds = [];
+            APP_DATA.forEach(function(r) { var v = String(r["BE GEO ID"] || "").trim(); if (v && _wsGeoIds.indexOf(v) === -1) _wsGeoIds.push(v); });
+            _wsGeoIds.sort();
+            var _wsIdbKey = _wsGeoIds.length > 0 ? "ws-geo-" + _wsGeoIds.join("_") : "ws-" + file.name;
+            finishLoad(file.name, APP_DATA.length, false, _wsIdbKey);
           } catch(err) {
             restoreUploadSection([]);
             console.error(err);
@@ -415,7 +424,11 @@ function parseCSVAndFinish(csvString, filename, headerAutoDetected) {
       setTimeout(function () {
         try {
           APP_DATA = transformData(results.data);
-          finishLoad(filename, APP_DATA.length, headerAutoDetected, "ws-" + filename);
+          var _wsGeoIds2 = [];
+          APP_DATA.forEach(function(r) { var v = String(r["BE GEO ID"] || "").trim(); if (v && _wsGeoIds2.indexOf(v) === -1) _wsGeoIds2.push(v); });
+          _wsGeoIds2.sort();
+          var _wsIdbKey2 = _wsGeoIds2.length > 0 ? "ws-geo-" + _wsGeoIds2.join("_") : "ws-" + filename;
+          finishLoad(filename, APP_DATA.length, headerAutoDetected, _wsIdbKey2);
         } catch (err) {
           restoreUploadSection();
           console.error(err);
@@ -463,7 +476,7 @@ function finishLoad(filename, rowCount, headerAutoDetected, idbType, loadedAt, f
     IDB.save(idbType, APP_DATA, {
       filename:         filename,
       rowCount:         rowCount,
-      loadedAt:         new Date().toISOString(),
+      loadedAt:         fromCache ? loadedAt : new Date().toISOString(),
       fileLastModified: APP_FILE_META && APP_FILE_META.lastModified ? APP_FILE_META.lastModified.toISOString() : null,
       displayName:      displayName,
       beGeoIds:         beGeoIds,
@@ -494,7 +507,13 @@ function finishLoad(filename, rowCount, headerAutoDetected, idbType, loadedAt, f
   dateEl.textContent = "";
 
   var activeTab = document.querySelector(".nav-link.active[data-bs-target]");
-  renderActiveTab(activeTab ? activeTab.dataset.bsTarget : "#tab-overview");
+  var _activeTarget = activeTab ? activeTab.dataset.bsTarget : "#tab-overview";
+  ANNOTATIONS.load().then(function () {
+    renderActiveTab(_activeTarget);
+  }).catch(function (err) {
+    console.warn("[AdoptDash] ANNOTATIONS.load() failed, rendering anyway:", err);
+    renderActiveTab(_activeTarget);
+  });
   // Always reset first so no dismissed state bleeds from a previous session
   window._dismissedNotifs = {};
   window._currentSessionKey = idbType || null;
@@ -546,7 +565,8 @@ function restoreUploadSection(cachedEntries) {
     }
     var basename = (entry.meta.filename || '').split(/[\\/]/).pop().replace(/\s*·\s*BE GEO ID.*$/, '');
     var dateStr = fmtDate(entry.meta.loadedAt);
-    html += '<div class="text-muted text-truncate" style="font-size:0.72rem" title="' + entry.meta.filename + '">' + basename + (dateStr ? ' &middot; ' + dateStr : '') + '</div>';
+    html += '<div class="text-muted text-truncate" style="font-size:0.72rem" title="' + entry.meta.filename + '">' + basename + '</div>';
+    if (dateStr) html += '<div class="text-muted" style="font-size:0.72rem">' + dateStr + '</div>';
     html += '</div>';
     html += '<div class="d-flex gap-1 flex-shrink-0">';
     html += '<button class="btn btn-sm btn-' + btnColor + ' idb-resume-btn py-0" data-idbtype="' + entry.type + '" title="Resume"><i class="bi bi-play-fill"></i></button>';
@@ -690,7 +710,9 @@ function restoreUploadSection(cachedEntries) {
       if (APP_MULTI_SESSIONS && APP_MULTI_SESSIONS.sessions.length > 0) {
         multiCards = APP_MULTI_SESSIONS.sessions.map(function(sess, i) {
           var name = sess.partnerName ? '<div class="fw-semibold small">' + sess.partnerName + '</div>' : '';
-          var loadedAt = APP_MULTI_SESSIONS.loadedAt || null;
+          // Use per-session IDB loadedAt if available, fall back to shared loadedAt
+          var idbEntry = cachedEntries.find(function(e) { return e.type === "cpi-" + sess.id; });
+          var loadedAt = (idbEntry && idbEntry.meta && idbEntry.meta.loadedAt) ? idbEntry.meta.loadedAt : (APP_MULTI_SESSIONS.loadedAt || null);
           var dateStr = loadedAt ? (function(iso){ var d=new Date(iso); return isNaN(d)?'':(d.toLocaleDateString(APP_LOCALE)+' '+d.toLocaleTimeString(APP_LOCALE,{hour:'2-digit',minute:'2-digit'})); })(loadedAt) : '';
           var hasHandle = !!(APP_MULTI_SESSIONS && APP_MULTI_SESSIONS.hasHandle);
           return '<div class="col-6"><div class="card border-warning mb-0 p-2">' +
@@ -846,13 +868,13 @@ function restoreUploadSection(cachedEntries) {
       if (sess._transformed) {
         APP_DATA = sess._transformed;
         APP_FILE_META = APP_MULTI_SESSIONS.fileMeta;
-        finishLoad(APP_MULTI_SESSIONS.fileMeta.name + " · BE GEO ID " + sess.id, APP_DATA.length, false, "cpi-" + sess.id, null, true);
+        finishLoad(APP_MULTI_SESSIONS.fileMeta.name + " · BE GEO ID " + sess.id, APP_DATA.length, false, "cpi-" + sess.id, APP_MULTI_SESSIONS.loadedAt, true);
       } else {
         showLoader("Processing " + sess.rows.length + " rows for " + sess.id + "…");
         setTimeout(function() {
           APP_DATA = transformData(sess.rows);
           APP_FILE_META = APP_MULTI_SESSIONS.fileMeta;
-          finishLoad(APP_MULTI_SESSIONS.fileMeta.name + " · BE GEO ID " + sess.id, APP_DATA.length, false, "cpi-" + sess.id, null, true);
+          finishLoad(APP_MULTI_SESSIONS.fileMeta.name + " · BE GEO ID " + sess.id, APP_DATA.length, false, "cpi-" + sess.id, APP_MULTI_SESSIONS.loadedAt, true);
         }, 0);
       }
     });
@@ -889,9 +911,26 @@ function restoreUploadSection(cachedEntries) {
   sec.querySelectorAll(".idb-clear-btn").forEach(function (btn) {
     btn.addEventListener("click", function () {
       var type = this.dataset.idbtype;
-      IDB.remove(type).then(function () {
-        IDB.removeHandle(type).catch(function() {});
-        IDB.loadAllMeta().then(function (entries) { restoreUploadSection(entries); });
+      // Load session data first to collect WS-IDs, then delete annotations for them
+      IDB.load(type).then(function (entry) {
+        var wsIds = [];
+        if (entry && entry.data) {
+          entry.data.forEach(function (r) {
+            var id = String(r["Deal WS-ID"] || "");
+            if (id) wsIds.push(id);
+          });
+        }
+        return IDB.remove(type).then(function () {
+          IDB.removeHandle(type).catch(function() {});
+          if (wsIds.length) ANNOTATIONS.clearForWsIds(wsIds);
+          IDB.loadAllMeta().then(function (entries) { restoreUploadSection(entries); });
+        });
+      }).catch(function () {
+        // Fallback: delete session even if load failed
+        IDB.remove(type).then(function () {
+          IDB.removeHandle(type).catch(function() {});
+          IDB.loadAllMeta().then(function (entries) { restoreUploadSection(entries); });
+        });
       });
     });
   });
@@ -906,6 +945,16 @@ function restoreUploadSection(cachedEntries) {
         hideRefreshToast();
         // Clear dismissed notifications so fresh data shows all notifications
         try { localStorage.removeItem(_notifStorageKey(type)); } catch(e) {}
+        // If this refreshed session is currently active, reload data and refresh notifications
+        if (window._currentSessionKey === type) {
+          IDB.load(type).then(function(entry) {
+            if (entry && entry.data) {
+              APP_DATA = entry.data;
+              window._dismissedNotifs = {};
+              showDataNotifications(APP_DATA);
+            }
+          });
+        }
         if (APP_MULTI_SESSIONS && type.indexOf("cpi-") === 0) APP_MULTI_SESSIONS.loadedAt = new Date().toISOString();
         IDB.loadAllMeta().then(function(en) { restoreUploadSection(en); });
       }).catch(function () {
@@ -925,6 +974,7 @@ function restoreUploadSection(cachedEntries) {
     if (!confirm("This will delete all cached sessions and your saved username. Continue?")) return;
     IDB.clearAll().then(function () {
       IDB.clearAllHandles().catch(function() {});
+      ANNOTATIONS.clearAll();
       localStorage.removeItem("ws-report-id");
       localStorage.removeItem("ws-client-id");
       localStorage.removeItem("ws-client-secret");
@@ -1516,12 +1566,23 @@ function refreshCpiFromHandle(file, geoId, cacheOnly) {
   });
 }
 
+// Returns APP_DATA filtered to exclude records flagged as excluded by the user
+function getActiveData() {
+  if (!APP_DATA) return APP_DATA;
+  if (!window.APP_EXCL_ACTIVE) return APP_DATA;
+  var excludedIds = ANNOTATIONS.getExcludedWsIds();
+  if (excludedIds.length === 0) return APP_DATA;
+  var idSet = {};
+  excludedIds.forEach(function (id) { idSet[id] = true; });
+  return APP_DATA.filter(function (r) { return !idSet[String(r["Deal WS-ID"] || "")]; });
+}
+
 function renderActiveTab(target) {
   switch (target) {
-    case "#tab-overview":  renderOverview(APP_DATA);  break;
-    case "#tab-details":   renderDetails(APP_DATA);   break;
-    case "#tab-pvi":       renderPVI(APP_DATA);       break;
-    case "#tab-testing":   renderInsights(APP_DATA);   break;
+    case "#tab-overview":  renderOverview(getActiveData());  break;
+    case "#tab-details":   renderDetails(APP_DATA);          break;  // details always shows all rows (dimmed)
+    case "#tab-pvi":       renderPVI(getActiveData());       break;
+    case "#tab-testing":   renderInsights(getActiveData());  break;
   }
 }
 
@@ -1638,7 +1699,7 @@ function showDataNotifications(data) {
       preset: (function() {
         var _today14rs = Math.floor(Date.now() / 86400000);
         var _from14rs  = _today14rs - 14;
-        return { optIn: ["OPTED IN", "Eligible"], rsFrom: _from14rs, rsTo: _today14rs };
+        return { stage: ["ELIGIBLE"], optIn: ["OPTED IN"], rsFrom: _from14rs, rsTo: _today14rs };
       })(),
       body: newOptIns > 0
         ? "<strong>" + newOptIns.toLocaleString() + "</strong> new opt-in" + (newOptIns !== 1 ? "s" : "") + " in the past 14 days"
@@ -1652,7 +1713,7 @@ function showDataNotifications(data) {
       preset: (function() {
         var _today14p = Math.floor(Date.now() / 86400000);
         var _from14p  = _today14p - 14;
-        return { optIn: ["OPTED IN", "Eligible"], rsFrom: _from14p, rsTo: _today14p };
+        return { stage: ["ELIGIBLE"], optIn: ["OPTED IN"], rsFrom: _from14p, rsTo: _today14p };
       })(),
       body: newOptInPotential > 0
         ? "<strong>" + fmtMoney(newOptInPotential) + "</strong> in potential incentives from new opt-ins"
@@ -1682,7 +1743,7 @@ function showDataNotifications(data) {
       preset: (function() {
         var _todayExp = Math.floor(Date.now() / 86400000);
         var _to14exp  = _todayExp + 14;
-        return { optIn: ["OPTED IN", "Eligible"], stage: ["Eligible"], expFrom: _todayExp, expTo: _to14exp };
+        return { optIn: ["OPTED IN"], stage: ["Eligible"], expFrom: _todayExp, expTo: _to14exp };
       })(),
       body: expiringSoon > 0
         ? "<strong>" + expiringSoon.toLocaleString() + "</strong> opted-in deal" + (expiringSoon !== 1 ? "s" : "") + " expir" + (expiringSoon !== 1 ? "e" : "es") + " within 14 days"
@@ -1727,6 +1788,8 @@ function resetApp() {
   sb.classList.remove("d-flex");
   sb.classList.add("d-none");
   document.getElementById("main-tab-bar").classList.add("d-none");
+  var cpiNav = document.getElementById("cpi-scroll-nav");
+  if (cpiNav) cpiNav.remove();
 
   // Clear notifications
   var notifC = document.getElementById("notif-toast-container");
@@ -1765,8 +1828,11 @@ function resetApp() {
 
 window.APP_DATA        = APP_DATA;
 window.APP_FILTER_STATE = APP_FILTER_STATE;
+window.APP_EXCL_ACTIVE  = APP_EXCL_ACTIVE;
 window.resetApp        = resetApp;
 window.renderActiveTab = renderActiveTab;
+window.renderOverview  = renderOverview;
+window.getActiveData   = getActiveData;
 
 window._dismissedNotifs = {};
 window._currentSessionKey = null;
@@ -1787,6 +1853,7 @@ window._dismissNotif = function(id) {
 window.navigateToDetails = function (preset) {
   window.APP_FILTER_STATE = window.APP_FILTER_STATE || {};
   window.APP_FILTER_STATE.details = null; // clear saved state so preset takes over
+  if (window.APP_EXCL_ACTIVE) preset = Object.assign({}, preset, { hideExcluded: true });
   window._detDeepLink = preset;
   var btn = document.querySelector('[data-bs-target="#tab-details"]');
   if (!btn) return;

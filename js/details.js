@@ -67,6 +67,222 @@ function renderDetails(data) {
   var showOverallProgress = false;
   var ucMissedPreset = false;
 
+  // ── Annotations (tags + comments + exclusions) keyed by Deal WS-ID ──────
+  var annotationsCache = ANNOTATIONS.getAll();
+  var activeTagFilters = [];  // tags used to filter rows
+  var tagFilterMode    = "ALL"; // "ALL" = AND, "ANY" = OR
+
+  // Returns only tag names that appear on WS-IDs present in the current data
+  function currentTagNames() {
+    var wsIds = new Set(data.map(function(r) { return String(r["Deal WS-ID"] || ""); }).filter(Boolean));
+    var tags  = new Set();
+    Object.keys(annotationsCache).forEach(function(id) {
+      if (wsIds.has(id)) {
+        (annotationsCache[id].tags || []).forEach(function(t) { tags.add(t); });
+      }
+    });
+    return Array.from(tags).sort();
+  }
+
+  // ── Annotation modal ──────────────────────────────────────────────────────
+  function openAnnotationModal(wsId, crPartyName, crPartyId) {
+    var existing        = annotationsCache[wsId] || { tags: [], comment: "", excluded: false };
+    var currentExcluded = ANNOTATIONS.isExcluded(wsId);
+    var allTags         = currentTagNames();
+
+    // Find all WS-IDs for this customer
+    var customerWsIds = crPartyId
+      ? data.filter(function(r){ return String(r["CR Party ID"] || "") === crPartyId; })
+            .map(function(r){ return String(r["Deal WS-ID"] || ""); })
+            .filter(Boolean)
+      : [];
+
+    // Are ALL UCs for this customer currently excluded?
+    var allCustomerExcluded = customerWsIds.length > 1 && customerWsIds.every(function(id) {
+      return ANNOTATIONS.isExcluded(id);
+    });
+
+    var tagChecks = allTags.map(function (t) {
+      var chk = (existing.tags || []).indexOf(t) !== -1 ? " checked" : "";
+      var tc  = ANNOTATIONS.tagColor(t);
+      var bs  = tc ? ' style="background:' + tc.bg + ';color:' + tc.color + ';border:1px solid ' + tc.border + '"' : '';
+      return '<div class="form-check form-check-inline">' +
+        '<input class="form-check-input annot-tag-check" type="checkbox" id="atag-' + escHtml(t) + '" value="' + escHtml(t) + '"' + chk + '>' +
+        '<label class="form-check-label annot-tag"' + bs + ' for="atag-' + escHtml(t) + '">' + escHtml(t) + '</label></div>';
+    }).join("");
+
+    // Exclude section (always shown)
+    var excludeSection =
+      '<div class="border rounded p-2 mb-3" style="background:#fafafa">' +
+      '<div class="form-check mb-0">' +
+      '<input class="form-check-input" type="checkbox" id="annot-excl-this"' + (currentExcluded ? " checked" : "") + '>' +
+      '<label class="form-check-label fw-semibold" for="annot-excl-this" style="font-size:0.85rem">' +
+      '<i class="bi bi-slash-circle me-1 text-danger"></i>Exclude this deal</label>' +
+      '</div>' +
+      (customerWsIds.length > 1
+        ? '<div class="form-check mt-1 mb-0">' +
+          '<input class="form-check-input" type="checkbox" id="annot-excl-all"' + (allCustomerExcluded ? " checked" : "") + '>' +
+          '<label class="form-check-label text-muted" for="annot-excl-all" style="font-size:0.8rem">' +
+          '<i class="bi bi-slash-circle me-1"></i>Exclude all ' + customerWsIds.length + ' UCs for ' + escHtml(crPartyName || "") + '</label>' +
+          '</div>'
+        : '') +
+      '<p class="text-muted mb-0 mt-2" style="font-size:0.75rem"><i class="bi bi-info-circle me-1"></i>This only affects the view within this dashboard. It does not update Workspan and has no impact on the CPI program whatsoever.</p>' +
+      '</div>';
+
+    var modalHtml =
+      '<div class="modal fade" id="annotModal" tabindex="-1">' +
+      '<div class="modal-dialog modal-dialog-centered">' +
+      '<div class="modal-content">' +
+      '<div class="modal-header py-2">' +
+      '<h6 class="modal-title"><i class="bi bi-chat-left-text me-2"></i>Notes &amp; Tags — ' + escHtml(wsId) + '</h6>' +
+      '<button type="button" class="btn-close btn-sm" data-bs-dismiss="modal"></button>' +
+      '</div>' +
+      '<div class="modal-body">' +
+      excludeSection +
+      '<div style="font-size:0.8rem;color:#888;margin-bottom:6px">' + escHtml(crPartyName || "") + '</div>' +
+      '<label class="form-label fw-semibold" style="font-size:0.82rem">Tags</label>' +
+      '<div id="annot-tag-list" class="mb-2">' + tagChecks + '</div>' +
+      '<div class="d-flex gap-2 mb-2">' +
+      '<input type="text" id="annot-new-tag" class="form-control form-control-sm" placeholder="+ new tag" style="max-width:160px">' +
+      '<button class="btn btn-sm btn-outline-secondary" id="annot-add-tag-btn">Add</button>' +
+      '</div>' +
+      (customerWsIds.length > 1
+        ? '<div class="form-check mb-3" style="font-size:0.8rem">' +
+          '<input class="form-check-input" type="checkbox" id="annot-tags-all-ucs">' +
+          '<label class="form-check-label text-muted" for="annot-tags-all-ucs">' +
+          '<i class="bi bi-tags me-1"></i>Apply these tags to all ' + customerWsIds.length + ' UCs for ' + escHtml(crPartyName || "") +
+          '</label></div>'
+        : '') +
+      '<label class="form-label fw-semibold" style="font-size:0.82rem">Comment</label>' +
+      '<textarea id="annot-comment" class="form-control form-control-sm" rows="4" style="resize:vertical">' + escHtml(existing.comment || "") + '</textarea>' +
+      '</div>' +
+      '<div class="modal-footer py-2">' +
+      '<button class="btn btn-sm btn-danger me-auto" id="annot-clear-btn">Clear all</button>' +
+      '<button class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>' +
+      '<button class="btn btn-sm btn-primary" id="annot-save-btn">Save</button>' +
+      '</div>' +
+      '</div></div></div>';
+
+    var existing_modal = document.getElementById("annotModal");
+    if (existing_modal) existing_modal.remove();
+    document.body.insertAdjacentHTML("beforeend", modalHtml);
+
+    var modalEl    = document.getElementById("annotModal");
+    var bsModal    = new bootstrap.Modal(modalEl);
+    var exclAllEl  = document.getElementById("annot-excl-all");
+    var exclThisEl = document.getElementById("annot-excl-this");
+
+    // "Exclude all" syncs "Exclude this" checkbox
+    if (exclAllEl && exclThisEl) {
+      exclAllEl.addEventListener("change", function () {
+        exclThisEl.checked = exclAllEl.checked;
+      });
+    }
+
+    // Add new tag dynamically
+    document.getElementById("annot-add-tag-btn").addEventListener("click", function () {
+      var val = document.getElementById("annot-new-tag").value.trim().toLowerCase().replace(/\s+/g, "-");
+      if (!val) return;
+      var tagList = document.getElementById("annot-tag-list");
+      if (tagList.querySelector('input[value="' + val + '"]')) return;
+      var tc2 = ANNOTATIONS.tagColor(val);
+      var bs2 = tc2 ? ' style="background:' + tc2.bg + ';color:' + tc2.color + ';border:1px solid ' + tc2.border + '"' : '';
+      var newCheck = document.createElement("div");
+      newCheck.className = "form-check form-check-inline";
+      newCheck.innerHTML = '<input class="form-check-input annot-tag-check" type="checkbox" id="atag-' + escHtml(val) + '" value="' + escHtml(val) + '" checked>' +
+        '<label class="form-check-label annot-tag"' + bs2 + ' for="atag-' + escHtml(val) + '">' + escHtml(val) + '</label>';
+      tagList.appendChild(newCheck);
+      document.getElementById("annot-new-tag").value = "";
+    });
+
+    // Clear all (tags, comment AND exclusion for this WS-ID)
+    document.getElementById("annot-clear-btn").addEventListener("click", function () {
+      ANNOTATIONS.remove(wsId).then(function () {
+        bsModal.hide();
+        applyFiltersAndRender();
+        rebuildTagFilterUI();
+      });
+    });
+
+    // Save
+    document.getElementById("annot-save-btn").addEventListener("click", function () {
+      var tags    = [];
+      modalEl.querySelectorAll(".annot-tag-check:checked").forEach(function (cb) { tags.push(cb.value); });
+      var comment        = document.getElementById("annot-comment").value.trim();
+      var exclThis       = exclThisEl.checked;
+      var exclAll        = exclAllEl ? exclAllEl.checked : false;
+      var tagsAllUcsEl   = document.getElementById("annot-tags-all-ucs");
+      var applyTagsToAll = tagsAllUcsEl ? tagsAllUcsEl.checked : false;
+
+      var saves = [ANNOTATIONS.saveFull(wsId, tags, comment, exclThis)];
+
+      if (customerWsIds.length > 1) {
+        var siblingIds = customerWsIds.filter(function(id) { return id !== wsId; });
+
+        if (applyTagsToAll) {
+          // Apply tags (and optionally exclusion) to all siblings, preserving each sibling's comment
+          siblingIds.forEach(function(id) {
+            var sib     = annotationsCache[id] || { tags: [], comment: "", excluded: false };
+            var sibExcl = (exclAll || allCustomerExcluded) ? exclAll : sib.excluded;
+            saves.push(ANNOTATIONS.saveFull(id, tags, sib.comment || "", sibExcl));
+          });
+        } else if (exclAll || allCustomerExcluded) {
+          // Only update exclusion for siblings, leave their tags untouched
+          saves.push(ANNOTATIONS.setExcludedForCustomer(siblingIds, exclAll));
+        }
+      }
+
+      Promise.all(saves).then(function () {
+        if (document.activeElement) document.activeElement.blur();
+        bsModal.hide();
+        applyFiltersAndRender();
+        rebuildTagFilterUI();
+      }).catch(function (err) {
+        console.error("[AdoptDash] Annotation save failed:", err);
+        alert("Could not save annotation. Please refresh the page and try again.\n\n" + (err && err.message ? err.message : err));
+      });
+    });
+
+    modalEl.addEventListener("hidden.bs.modal", function () { modalEl.remove(); });
+    bsModal.show();
+  }
+
+  function rebuildTagFilterUI() {
+    var container = document.getElementById("annot-tag-filter-list");
+    if (!container) return;
+    var allTags = currentTagNames();
+    container.innerHTML = allTags.map(function (t) {
+      var safeid = "filter-annottag-" + t.replace(/[^a-z0-9]/gi, "-");
+      var chk = activeTagFilters.indexOf(t) !== -1 ? " checked" : "";
+      var tc = ANNOTATIONS.tagColor(t);
+      var badgeStyle = tc ? ' style="background:' + tc.bg + ';color:' + tc.color + ';border:1px solid ' + tc.border + '"' : '';
+      return '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="' + safeid + '" value="' + escHtml(t) + '"' + chk + '>' +
+        '<label class="form-check-label annot-tag annot-tag-' + escHtml(t.replace(/[^a-z0-9]/gi, "-")) + '"' + badgeStyle + ' for="' + safeid + '">' + escHtml(t) + '</label></div>';
+    }).join("");
+    container.querySelectorAll("input[type=checkbox]").forEach(function (cb) {
+      cb.addEventListener("change", function () {
+        activeTagFilters = [];
+        container.querySelectorAll("input:checked").forEach(function (c) { activeTagFilters.push(c.value); });
+        applyFiltersAndRender();
+      });
+    });
+
+    // Wire the ALL / ANY toggle
+    var toggle = document.getElementById("tag-mode-toggle");
+    if (toggle) {
+      toggle.querySelectorAll(".tag-mode-btn").forEach(function (btn) {
+        if (btn.dataset.mode === tagFilterMode) btn.classList.add("active");
+        else btn.classList.remove("active");
+        btn.addEventListener("click", function () {
+          tagFilterMode = btn.dataset.mode;
+          toggle.querySelectorAll(".tag-mode-btn").forEach(function (b) { b.classList.remove("active"); });
+          btn.classList.add("active");
+          applyFiltersAndRender();
+        });
+      });
+    }
+  }
+
   // Restore sort state from saved session (filter DOM restored later, after DOM is built)
   var _detSaved = window.APP_FILTER_STATE && window.APP_FILTER_STATE.details;
   var _hadDeepLink = !!window._detDeepLink;
@@ -186,6 +402,7 @@ function renderDetails(data) {
 
   // Quick-toggle filters
   html += '<div class="filter-group">';
+  html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-hide-excluded"><label class="form-check-label" for="filter-hide-excluded"><i class="bi bi-slash-circle me-1 text-danger" style="font-size:0.75rem"></i>Hide excluded</label></div>';
   html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-new-eligible"><label class="form-check-label" for="filter-new-eligible">New Eligible' + tip("UCs eligible for opt-in, booked within the past 30 days.") + '</label></div>';
   html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-expires-soon"><label class="form-check-label" for="filter-expires-soon">Expires Soon (&lt;1M)' + tip("Deals where the incentive expires in less than 1 month.") + '</label></div>';
   html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-earned"><label class="form-check-label" for="filter-earned">Earned' + tip("Deals where incentives have been earned.") + '</label></div>';
@@ -222,6 +439,12 @@ function renderDetails(data) {
   html += '<div class="filter-group"><label class="group-label">Incentive Expiry Date</label>'  + makeDateSlider("det-exp", dateBounds.exp) + '</div>';
   html += '<div class="filter-group"><label class="group-label">Earn Date' + tip("Moving this slider will automatically check the Earned filter.") + '</label>'              + makeDateSlider("det-ea",  dateBounds.ea)  + '</div>';
 
+  html += '<div class="filter-group"><label class="group-label"><i class="bi bi-tags me-1"></i>Tags' +
+    '<span class="tag-mode-toggle ms-2" id="tag-mode-toggle" title="Switch between matching ALL or ANY selected tags">' +
+      '<button type="button" class="btn btn-xs tag-mode-btn active" data-mode="ALL">ALL</button>' +
+      '<button type="button" class="btn btn-xs tag-mode-btn" data-mode="ANY">ANY</button>' +
+    '</span>' +
+  '</label><div id="annot-tag-filter-list"></div></div>';
   html += '</div>'; // /det-filter-body
   html += '</div>'; // /sidebar
 
@@ -429,6 +652,7 @@ function renderDetails(data) {
     var _clrBtns = ["det-2tpartner-clear","det-crparty-clear"];
     _clrBtns.forEach(function(id) { var b = document.getElementById(id); if (b) b.classList.add("d-none"); });
     el.querySelectorAll('input[type=checkbox]').forEach(function (cb) { cb.checked = false; });
+    activeTagFilters = [];
     document.getElementById("filter-portfolio").value = "";
     document.getElementById("filter-offer").value = "";
     document.getElementById("filter-uc").value = "";
@@ -452,6 +676,7 @@ function renderDetails(data) {
   // Apply deep-link preset if navigated from another tab
   if (window._detDeepLink) {
     var dl = window._detDeepLink;
+    if (dl.hideExcluded) { var _cbHideExcl = document.getElementById("filter-hide-excluded"); if (_cbHideExcl) _cbHideExcl.checked = true; }
     if (dl.checkboxIds) { dl.checkboxIds.forEach(function(id) { var cb = document.getElementById(id); if (cb) cb.checked = true; }); }
     if (dl.stage)         { dl.stage.forEach(function(s) { document.querySelectorAll('#filter-stage input[type=checkbox]').forEach(function(cb) { if (cb.value.toUpperCase() === s.toUpperCase()) cb.checked = true; }); }); }
     if (dl.ucMissed)      { ucMissedPreset = true; }
@@ -524,7 +749,15 @@ function renderDetails(data) {
     updateStageSliderDisplay();
   }
 
-  applyFiltersAndRender();
+  // Load annotations from IDB, populate tag filter UI, then render
+  ANNOTATIONS.load().then(function (cache) {
+    annotationsCache = cache;
+    rebuildTagFilterUI();
+    applyFiltersAndRender();
+  }).catch(function (err) {
+    console.warn("[AdoptDash] ANNOTATIONS.load() failed in Details, rendering anyway:", err);
+    applyFiltersAndRender();
+  });
 
   function _restoreDetailsState(st) {
     // Text inputs
@@ -719,6 +952,24 @@ function renderDetails(data) {
       if (aapChecked          && String(r["AAP Flag"] || "") !== "Yes")                      return false;
       if (maxIncentiveChecked && norm(r["Maximum Incentive Deal Flag"]) !== "YES")          return false;
 
+      // Tag filter: AND = row must have ALL selected tags; ANY = row needs at least one
+      if (activeTagFilters.length > 0) {
+        var wsIdRow  = String(r["Deal WS-ID"] || "");
+        var rowAnnot = annotationsCache[wsIdRow];
+        var rowTags  = rowAnnot ? (rowAnnot.tags || []) : [];
+        if (tagFilterMode === "ANY") {
+          var hasAny = false;
+          for (var _ti = 0; _ti < activeTagFilters.length; _ti++) {
+            if (rowTags.indexOf(activeTagFilters[_ti]) !== -1) { hasAny = true; break; }
+          }
+          if (!hasAny) return false;
+        } else {
+          for (var _ti = 0; _ti < activeTagFilters.length; _ti++) {
+            if (rowTags.indexOf(activeTagFilters[_ti]) === -1) return false;
+          }
+        }
+      }
+
       if (bkFromDate || bkToDate) {
         var d = toDate(r["Booking Date"]);
         if (d) {
@@ -752,6 +1003,11 @@ function renderDetails(data) {
           if (expToDate   && d3 > expToDate)   return false;
         }
       }
+
+      // Exclude filter: hide excluded rows when checkbox is checked
+      var _hideExcl = !!(document.getElementById("filter-hide-excluded") && document.getElementById("filter-hide-excluded").checked);
+      if (_hideExcl && ANNOTATIONS.isExcluded(String(r["Deal WS-ID"] || ""))) return false;
+
       return true;
     });
 
@@ -802,7 +1058,17 @@ function renderDetails(data) {
     filteredData.sort(function (a, b) {
       var av = a[sortField], bv = b[sortField];
       var primary;
-      if (sortField === "_daysSinceOptIn") {
+      if (sortField === "_annot") {
+        var _aAnnot = annotationsCache[String(a["Deal WS-ID"] || "")] || { tags: [], comment: "" };
+        var _bAnnot = annotationsCache[String(b["Deal WS-ID"] || "")] || { tags: [], comment: "" };
+        var _aStr = (_aAnnot.tags || []).join(",") + (_aAnnot.comment || "");
+        var _bStr = (_bAnnot.tags || []).join(",") + (_bAnnot.comment || "");
+        // Rows with annotations sort first (asc), empty last
+        if (!_aStr && !_bStr) primary = 0;
+        else if (!_aStr) primary = sortDir === "asc" ? 1 : -1;
+        else if (!_bStr) primary = sortDir === "asc" ? -1 : 1;
+        else primary = sortDir === "asc" ? _aStr.localeCompare(_bStr) : _bStr.localeCompare(_aStr);
+      } else if (sortField === "_daysSinceOptIn") {
         var _norm4 = function(x) { return x === null || x === undefined ? "" : String(x).replace(/\u00A0/g," ").trim().toUpperCase(); };
         var _dso = function(r) {
           if ((_norm4(r["Stage"]) !== "ELIGIBLE" && _norm4(r["Stage"]) !== "EXPIRED") || !toDate(r["Adopt Rebate Start Date"])) return -1;
@@ -850,12 +1116,33 @@ function renderDetails(data) {
     html += metricCard("$" + Math.round(s.missed).toLocaleString(),    "Total Missed",           "Total amount of missed incentives. The highest incentive per unique UC per offer per CR Party ID is counted.");
     html += metricCard("$" + Math.round(s.potential).toLocaleString(), "Total Potential",        "Total amount of remaining incentives. The highest incentive per unique UC per offer per CR Party ID is counted.");
     html += metricCard("$" + Math.round(s.earned).toLocaleString(),    "Total Estimated Earned", "Estimated amount of earned incentives according to program rules. Payment process goes through further steps validated by the CPI team.");
-    html += '<div class="d-flex align-items-center ms-auto">' +
+    html += '<div class="d-flex flex-column align-items-end ms-auto gap-1">' +
       '<button id="det-export-btn" class="btn btn-sm btn-outline-success" style="font-size:0.82rem;white-space:nowrap">' +
-      '<i class="bi bi-file-earmark-excel me-1"></i>Export to Excel</button></div>';
+      '<i class="bi bi-file-earmark-excel me-1"></i>Export to Excel</button>' +
+      '<button id="det-annot-export-btn" class="btn btn-sm btn-outline-secondary" style="font-size:0.75rem;white-space:nowrap" title="Export annotations &amp; tags to CSV">' +
+      '<i class="bi bi-download me-1"></i>Export Notes</button>' +
+      '<label class="btn btn-sm btn-outline-secondary mb-0" style="font-size:0.75rem;white-space:nowrap;cursor:pointer" title="Import annotations &amp; tags from CSV">' +
+      '<i class="bi bi-upload me-1"></i>Import Notes<input type="file" id="det-annot-import-input" accept=".csv" style="display:none"></label>' +
+      '</div>';
     document.getElementById("det-summary").innerHTML = html;
     document.getElementById("det-export-btn").addEventListener("click", function () {
       exportDetailsToXlsx(rows);
+    });
+    document.getElementById("det-annot-export-btn").addEventListener("click", function () {
+      ANNOTATIONS.exportJSON();
+    });
+    document.getElementById("det-annot-import-input").addEventListener("change", function (e) {
+      var file = e.target.files && e.target.files[0];
+      if (!file) return;
+      ANNOTATIONS.importJSON(file).then(function (count) {
+        annotationsCache = ANNOTATIONS.getAll();
+        applyFiltersAndRender();
+        rebuildTagFilterUI();
+        alert("Imported " + count + " annotation(s).");
+      }).catch(function (err) {
+        alert("Import failed: " + err.message);
+      });
+      e.target.value = "";
     });
   }
 
@@ -912,7 +1199,8 @@ function renderDetails(data) {
       ] : []),
       { label: "Estimated<br>Earned Incentives", field: "Estimated Earned Incentives", isCurrency: true, style: "min-width:90px;max-width:110px" },
       { label: "Deal WS-ID",                 field: "Deal WS-ID",                   style: "min-width:140px", isWsId: true },
-      { label: "Status",                     field: "_status",                      isStatus: true }
+      { label: "Status",                     field: "_status",                      isStatus: true },
+      { label: "Notes <span class='badge bg-warning text-dark' style='font-size:0.6rem;vertical-align:middle'>Beta</span>", field: "_annot", isAnnot: true, style: "min-width:90px" }
     ];
 
     var sortableCols = {
@@ -927,7 +1215,8 @@ function renderDetails(data) {
       "Current stage": true,
       "Booking Date": true,
       "Adopt Rebate Start Date": true,
-      "Deal Incentive Expiry Date": true
+      "Deal Incentive Expiry Date": true,
+      "_annot": true
     };
     var thead = "<thead><tr>" + cols.map(function (c) {
       var styleAttr = c.style ? 'style="' + c.style + (sortableCols[c.field] ? ";cursor:pointer;user-select:none" : "") + '"' : '';
@@ -1008,8 +1297,10 @@ function renderDetails(data) {
       pageRows.forEach(function (r) {
         var expiryObj = toDate(r["Deal Incentive Expiry Date"]);
         var isExpiredRow = expiryObj && expiryObj < today;
-        var riskClass = stageRisk[r["Current stage"]] || "";
-        tbody += '<tr class="' + riskClass + '">';
+        var riskClass    = stageRisk[r["Current stage"]] || "";
+        var _wsIdRow     = String(r["Deal WS-ID"] || "");
+        var _exclRow     = ANNOTATIONS.isExcluded(_wsIdRow);
+        tbody += '<tr class="' + riskClass + (_exclRow ? " row-excluded" : "") + '">';
         cols.forEach(function (c) {
           var val = r[c.field];
           var cell = "";
@@ -1063,6 +1354,29 @@ function renderDetails(data) {
             else if (stg2 === "EXPIRED")  icons.push('<i class="bi bi-clock" style="color:#888" title="Expired"></i>');
             else if (r["Earned?"] !== true) icons.push('<i class="bi bi-x-circle-fill" style="color:#D13438" title="Not Eligible"></i>');
             cell = '<span style="white-space:nowrap">' + icons.join(" ") + '</span>';
+          } else if (c.isAnnot) {
+            var _wsId2    = String(r["Deal WS-ID"] || "");
+            var _annot    = annotationsCache[_wsId2] || { tags: [], comment: "" };
+            var _tagHtml  = (_annot.tags || []).map(function (t) {
+              var _tc = ANNOTATIONS.tagColor(t);
+              var _bs = _tc ? ' style="background:' + _tc.bg + ';color:' + _tc.color + ';border-color:' + _tc.border + '"' : '';
+              return '<span class="annot-tag"' + _bs + '>' + escHtml(t) + '</span>';
+            }).join(" ");
+            var _commentIcon = _annot.comment
+              ? ' <i class="bi bi-chat-left-text-fill annot-has-comment" title="' + escHtml(_annot.comment) + '"></i>'
+              : '';
+            var _crName    = String(r["CR Party Name"] || "");
+            var _crPartyId = String(r["CR Party ID"] || "");
+            var _excl2     = ANNOTATIONS.isExcluded(_wsId2);
+            var _exclIcon  = _excl2 ? "bi-slash-circle-fill text-danger" : "bi-slash-circle text-muted";
+            var _exclTitle = _excl2 ? "Re-include deal" : "Exclude deal";
+            cell = '<div class="annot-cell">' + _tagHtml + _commentIcon +
+              '<button class="btn btn-link btn-sm p-0 ms-1 annot-excl-btn" style="font-size:0.8rem;vertical-align:middle" ' +
+              'data-wsid="' + escHtml(_wsId2) + '" title="' + _exclTitle + '">' +
+              '<i class="bi ' + _exclIcon + '"></i></button>' +
+              '<button class="btn btn-link btn-sm p-0 ms-1 annot-edit-btn" style="font-size:0.75rem;vertical-align:middle" ' +
+              'data-wsid="' + escHtml(_wsId2) + '" data-crname="' + escHtml(_crName) + '" data-crpartyid="' + escHtml(_crPartyId) + '" title="Edit notes &amp; tags">' +
+              '<i class="bi bi-pencil-square"></i></button></div>';
           } else if (c.field === "Current stage") {
             cell = '<span class="stage-badge stage-' + escHtml(val) + '">' + escHtml(val) + '</span>';
           } else if (c.field === "Days in stage") {
@@ -1214,6 +1528,25 @@ function renderDetails(data) {
           window.APP_FILTER_STATE.details.sortField = sortField;
           window.APP_FILTER_STATE.details.sortDir   = sortDir;
         }
+      });
+    });
+
+    // Wire annotation edit buttons
+    document.getElementById("det-table-area").querySelectorAll(".annot-edit-btn").forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        openAnnotationModal(btn.dataset.wsid, btn.dataset.crname, btn.dataset.crpartyid);
+      });
+    });
+
+    // Wire annotation exclude-toggle buttons
+    document.getElementById("det-table-area").querySelectorAll(".annot-excl-btn").forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var wsid = btn.dataset.wsid;
+        ANNOTATIONS.setExcluded(wsid, !ANNOTATIONS.isExcluded(wsid)).then(function () {
+          applyFiltersAndRender();
+        });
       });
     });
 
@@ -1389,7 +1722,10 @@ function renderDetails(data) {
           { label:"Deal WS-ID",              field:"Deal WS-ID" },
           { label:"Opt-In Status",           field:"Adopt Rebate Opt-In Status" },
           { label:"Stage",                   field:"Stage" },
-          { label:"Earned?",                 field:"Earned?" }
+          { label:"Earned?",                 field:"Earned?" },
+          { label:"Tags",                    field:"_annotTags",    isAnnotTags: true },
+          { label:"Comment",                 field:"_annotComment", isAnnotComment: true },
+          { label:"Excluded",                field:"_annotExcl",    isAnnotExcl: true }
         ];
 
         var headerRow = colDefs.map(function(c){ return c.label; });
@@ -1417,6 +1753,19 @@ function renderDetails(data) {
               return "";
             }
             if (c.field === "Earned?") return v === true ? "Yes" : "No";
+            if (c.isAnnotTags) {
+              var _wsIdEx = String(r["Deal WS-ID"] || "");
+              var _annotEx = annotationsCache[_wsIdEx];
+              return _annotEx && _annotEx.tags && _annotEx.tags.length ? _annotEx.tags.join(", ") : "";
+            }
+            if (c.isAnnotComment) {
+              var _wsIdCm = String(r["Deal WS-ID"] || "");
+              var _annotCm = annotationsCache[_wsIdCm];
+              return _annotCm && _annotCm.comment ? _annotCm.comment : "";
+            }
+            if (c.isAnnotExcl) {
+              return ANNOTATIONS.isExcluded(String(r["Deal WS-ID"] || "")) ? "Yes" : "";
+            }
             if (c.field === "_missedStages") {
               var optInDate = toDate(r["Adopt Rebate Start Date"]);
               var msParts = [];
@@ -1443,6 +1792,9 @@ function renderDetails(data) {
           if (c.field === "CR Party Name" || c.field === "2T Partner Name") return { wch: 35 };
           if (c.field === "Deal WS-ID" || c.field === "Track") return { wch: 22 };
           if (c.field === "_missedStages") return { wch: 30 };
+          if (c.isAnnotTags)    return { wch: 30 };
+          if (c.isAnnotComment) return { wch: 50 };
+          if (c.isAnnotExcl)    return { wch: 10 };
           return { wch: 16 };
         });
 

@@ -54,9 +54,8 @@ function renderLifecycle(data) {
   var allOffers  = Array.from(oSet).sort();
 
   // ── HTML
-  var html = '<div class="disclaimer-card mb-3">';
-  html += 'The chart below depicts lifecycle progression using the net booking value of eligible SKUs. Only deals booked within the last 18 fiscal months are included. One use case per offer and CR Party ID is selected: preference is given to opted-in use cases, otherwise, the highest-incentive use case is chosen.';
-  html += '</div>';
+  var html = '<h5 class="mb-3"><i class="bi bi-bar-chart me-2"></i>Lifecycle</h5>';
+  html += '<p class="text-muted small mb-3">Depicts lifecycle progression using the net booking value of eligible SKUs. Only deals booked within the last 18 fiscal months are included. One use case per offer and CR Party ID is selected: preference is given to opted-in use cases, otherwise the highest-incentive use case is chosen.</p>';
 
   html += '<div class="slicer-row mb-3">';
   html += '<label for="lc-portfolio">Portfolio:</label>';
