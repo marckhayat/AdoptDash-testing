@@ -1699,7 +1699,7 @@ function showDataNotifications(data) {
       preset: (function() {
         var _today14rs = Math.floor(Date.now() / 86400000);
         var _from14rs  = _today14rs - 14;
-        return { optIn: ["OPTED IN", "Eligible"], rsFrom: _from14rs, rsTo: _today14rs };
+        return { stage: ["ELIGIBLE"], optIn: ["OPTED IN"], rsFrom: _from14rs, rsTo: _today14rs };
       })(),
       body: newOptIns > 0
         ? "<strong>" + newOptIns.toLocaleString() + "</strong> new opt-in" + (newOptIns !== 1 ? "s" : "") + " in the past 14 days"
@@ -1713,7 +1713,7 @@ function showDataNotifications(data) {
       preset: (function() {
         var _today14p = Math.floor(Date.now() / 86400000);
         var _from14p  = _today14p - 14;
-        return { optIn: ["OPTED IN", "Eligible"], rsFrom: _from14p, rsTo: _today14p };
+        return { stage: ["ELIGIBLE"], optIn: ["OPTED IN"], rsFrom: _from14p, rsTo: _today14p };
       })(),
       body: newOptInPotential > 0
         ? "<strong>" + fmtMoney(newOptInPotential) + "</strong> in potential incentives from new opt-ins"
@@ -1743,7 +1743,7 @@ function showDataNotifications(data) {
       preset: (function() {
         var _todayExp = Math.floor(Date.now() / 86400000);
         var _to14exp  = _todayExp + 14;
-        return { optIn: ["OPTED IN", "Eligible"], stage: ["Eligible"], expFrom: _todayExp, expTo: _to14exp };
+        return { optIn: ["OPTED IN"], stage: ["Eligible"], expFrom: _todayExp, expTo: _to14exp };
       })(),
       body: expiringSoon > 0
         ? "<strong>" + expiringSoon.toLocaleString() + "</strong> opted-in deal" + (expiringSoon !== 1 ? "s" : "") + " expir" + (expiringSoon !== 1 ? "e" : "es") + " within 14 days"
