@@ -1601,6 +1601,11 @@ function showDataNotifications(data) {
   var past14 = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 14);
   var next14 = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 14, 23, 59, 59, 999);
 
+  // Local-midnight epoch days (matches how date strings like "6/15/2025" are parsed by new Date())
+  var _localTodayEpochDay = Math.floor(today0.getTime() / 86400000);
+  var _localFrom14        = Math.floor(past14.getTime() / 86400000);
+  var _localTo14          = Math.floor(next14.getTime() / 86400000);
+
   function pd(x) {
     if (!x) return null;
     if (x instanceof Date) return isNaN(x.getTime()) ? null : x;
@@ -1683,9 +1688,7 @@ function showDataNotifications(data) {
       icon: "bi-star-fill text-primary",
       title: "New Eligible Opportunities",
       preset: (function() {
-        var _today14 = Math.floor(Date.now() / 86400000);
-        var _from14  = _today14 - 14;
-        return { stage: ["ELIGIBLE"], optIn: ["PENDING"], bkFrom: _from14, bkTo: _today14 };
+        return { stage: ["ELIGIBLE"], optIn: ["PENDING"], bkFrom: _localFrom14, bkTo: _localTodayEpochDay };
       })(),
       body: newEligible > 0
         ? "<strong>" + newEligible.toLocaleString() + "</strong> new eligible opportunit" + (newEligible !== 1 ? "ies" : "y") + " booked in the past 14 days (" + newEligibleKeys.size.toLocaleString() + " unique)"
@@ -1697,9 +1700,7 @@ function showDataNotifications(data) {
       icon: "bi-hand-thumbs-up-fill text-primary",
       title: "New Opt-ins",
       preset: (function() {
-        var _today14rs = Math.floor(Date.now() / 86400000);
-        var _from14rs  = _today14rs - 14;
-        return { stage: ["ELIGIBLE"], optIn: ["OPTED IN"], rsFrom: _from14rs, rsTo: _today14rs };
+        return { stage: ["ELIGIBLE"], optIn: ["OPTED IN"], rsFrom: _localFrom14, rsTo: _localTodayEpochDay };
       })(),
       body: newOptIns > 0
         ? "<strong>" + newOptIns.toLocaleString() + "</strong> new opt-in" + (newOptIns !== 1 ? "s" : "") + " in the past 14 days"
@@ -1711,9 +1712,7 @@ function showDataNotifications(data) {
       icon: "bi-piggy-bank-fill text-success",
       title: "New Potential",
       preset: (function() {
-        var _today14p = Math.floor(Date.now() / 86400000);
-        var _from14p  = _today14p - 14;
-        return { stage: ["ELIGIBLE"], optIn: ["OPTED IN"], rsFrom: _from14p, rsTo: _today14p };
+        return { stage: ["ELIGIBLE"], optIn: ["OPTED IN"], rsFrom: _localFrom14, rsTo: _localTodayEpochDay };
       })(),
       body: newOptInPotential > 0
         ? "<strong>" + fmtMoney(newOptInPotential) + "</strong> in potential incentives from new opt-ins"
@@ -1726,9 +1725,7 @@ function showDataNotifications(data) {
       title: "Incentives Earned",
       alwaysLink: true,
       preset: (function() {
-        var _todayEa = Math.floor(Date.now() / 86400000);
-        var _from14ea = _todayEa - 14;
-        return { checkboxIds: ["filter-earned"], eaFrom: _from14ea, eaTo: _todayEa };
+        return { checkboxIds: ["filter-earned"], eaFrom: _localFrom14, eaTo: _localTodayEpochDay };
       })(),
       body: earnedLast14 > 0
         ? "<strong>" + fmtMoney(earnedLast14) + "</strong> in incentives earned over the past 14 days"
@@ -1741,9 +1738,7 @@ function showDataNotifications(data) {
       title: "Expiring Soon",
       emptyMsg: "Nothing expiring in the coming 14 days.",
       preset: (function() {
-        var _todayExp = Math.floor(Date.now() / 86400000);
-        var _to14exp  = _todayExp + 14;
-        return { optIn: ["OPTED IN"], stage: ["Eligible"], expFrom: _todayExp, expTo: _to14exp };
+        return { optIn: ["OPTED IN"], stage: ["Eligible"], expFrom: _localTodayEpochDay, expTo: _localTo14 };
       })(),
       body: expiringSoon > 0
         ? "<strong>" + expiringSoon.toLocaleString() + "</strong> opted-in deal" + (expiringSoon !== 1 ? "s" : "") + " expir" + (expiringSoon !== 1 ? "e" : "es") + " within 14 days"
