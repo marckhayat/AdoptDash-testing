@@ -17,7 +17,7 @@ var APP_FILTER_STATE = { details: null, lifecycle: null, cpiAdopt: null, custome
 var APP_IS_DISTI = false;
 var APP_MULTI_SESSIONS = null; // { sessions: [...], fileMeta: {...} }
 var APP_EXCL_ACTIVE = false;   // when true, excluded deals are removed from overview/pvi/insights calculations
-var APP_VERSION = "v6.8.7";
+var APP_VERSION = "v6.8.7.1";
 // Use the browser's preferred language for date formatting (respects user's browser locale setting)
 var APP_LOCALE = navigator.language || undefined;
 // Holds a FileSystemFileHandle from showOpenFilePicker() to be persisted after load
@@ -868,13 +868,13 @@ function restoreUploadSection(cachedEntries) {
       if (sess._transformed) {
         APP_DATA = sess._transformed;
         APP_FILE_META = APP_MULTI_SESSIONS.fileMeta;
-        finishLoad(APP_MULTI_SESSIONS.fileMeta.name + " · BE GEO ID " + sess.id, APP_DATA.length, false, "cpi-" + sess.id, APP_MULTI_SESSIONS.loadedAt, true);
+        finishLoad(APP_MULTI_SESSIONS.fileMeta.name + " · BE GEO ID " + sess.id, APP_DATA.length, false, "cpi-" + sess.id, APP_MULTI_SESSIONS.loadedAt, false);
       } else {
         showLoader("Processing " + sess.rows.length + " rows for " + sess.id + "…");
         setTimeout(function() {
           APP_DATA = transformData(sess.rows);
           APP_FILE_META = APP_MULTI_SESSIONS.fileMeta;
-          finishLoad(APP_MULTI_SESSIONS.fileMeta.name + " · BE GEO ID " + sess.id, APP_DATA.length, false, "cpi-" + sess.id, APP_MULTI_SESSIONS.loadedAt, true);
+          finishLoad(APP_MULTI_SESSIONS.fileMeta.name + " · BE GEO ID " + sess.id, APP_DATA.length, false, "cpi-" + sess.id, APP_MULTI_SESSIONS.loadedAt, false);
         }, 0);
       }
     });
@@ -945,8 +945,8 @@ function restoreUploadSection(cachedEntries) {
         hideRefreshToast();
         // Clear dismissed notifications so fresh data shows all notifications
         try { localStorage.removeItem(_notifStorageKey(type)); } catch(e) {}
-        // If this refreshed session is currently active, reload data and refresh notifications
-        if (window._currentSessionKey === type) {
+        // If this refreshed session is currently active and the dashboard is showing, reload data and refresh notifications
+        if (window._currentSessionKey === type && document.getElementById("upload-section").classList.contains("d-none")) {
           IDB.load(type).then(function(entry) {
             if (entry && entry.data) {
               APP_DATA = entry.data;
@@ -1598,8 +1598,8 @@ function showDataNotifications(data) {
 
   var now    = new Date();
   var today0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  var past14 = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 13);
-  var next14 = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 13, 23, 59, 59, 999);
+  var past14 = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 14);
+  var next14 = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 14, 23, 59, 59, 999);
 
   function pd(x) {
     if (!x) return null;
